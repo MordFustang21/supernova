@@ -6,8 +6,7 @@ import (
 
 type Route struct {
 	rq               *Request
-	rs               *Response
-	rr               RequestResponse
+	routeFunc        func(*Request)
 	routeParamsIndex map[int]string
 	route            string
 }
@@ -31,5 +30,5 @@ func (r *Route) prepare() {
 }
 
 func (r *Route) call() {
-	r.rr(r.rq, r.rs)
+	r.routeFunc(r.rq)
 }

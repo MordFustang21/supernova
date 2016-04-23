@@ -15,7 +15,6 @@ func (sn *SuperNova) Serve(addr string) {
 
 func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 	request := NewRequest(ctx)
-	response := new(Response)
 
 	pathParts := strings.Split(string(ctx.Request.RequestURI()), "/")
 	path := strings.Join(pathParts, "/")
@@ -25,7 +24,6 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 			route := sn.Paths[routeIndex]
 			if route.route == path || route.route == path + "/" {
 				route.rq = request
-				route.rs = response
 
 				//Prepare data for call
 				route.prepare()
@@ -39,11 +37,14 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 		_, pathParts = pathParts[len(pathParts) - 1], pathParts[:len(pathParts) - 1]
 		path = strings.Join(pathParts, "/")
 	}
+	println("Not found")
+	ctx.Error("not found", fasthttp.StatusNotFound)
 }
 
-func (sn *SuperNova) AddRoute(route string, rr RequestResponse) {
+func (sn *SuperNova) AddRoute(route string, routeFunc func(*Request)) {
+	//Build route and assign function
 	routeObj := new(Route)
-	routeObj.rr = rr
+	routeObj.routeFunc = routeFunc
 
 	routeObj.routeParamsIndex = make(map[int]string)
 
@@ -56,7 +57,6 @@ func (sn *SuperNova) AddRoute(route string, rr RequestResponse) {
 		} else {
 			baseDir += routeParts[i] + "/"
 		}
-
 	}
 
 	routeObj.route = baseDir
