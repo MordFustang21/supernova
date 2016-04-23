@@ -3,10 +3,36 @@ package superNova
 import (
 	"github.com/valyala/fasthttp"
 	"strings"
+	"os"
+	"time"
+	"io/ioutil"
+	"log"
+	"mime"
+	"sync"
 )
 
 type SuperNova struct {
-	Paths []Route
+	Paths         []Route
+	staticDirs    []string
+	cachedStatic  *CachedStatic
+	maxCachedTime int64
+}
+
+type CachedObj struct {
+	data       []byte
+	timeCached time.Time
+}
+
+type CachedStatic struct {
+	mutex sync.Mutex
+	files map[string]*CachedObj
+}
+
+func Super() *SuperNova {
+	s := new(SuperNova)
+	s.cachedStatic = new(CachedStatic)
+	s.cachedStatic.files = make(map[string]*CachedObj)
+	return s
 }
 
 func (sn *SuperNova) Serve(addr string) {
@@ -37,6 +63,14 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 		_, pathParts = pathParts[len(pathParts) - 1], pathParts[:len(pathParts) - 1]
 		path = strings.Join(pathParts, "/")
 	}
+
+	//Check for static file
+	served := sn.serveStatic(request)
+
+	if served {
+		return
+	}
+
 	println("Not found")
 	ctx.Error("not found", fasthttp.StatusNotFound)
 }
@@ -66,4 +100,63 @@ func (sn *SuperNova) AddRoute(route string, routeFunc func(*Request)) {
 	}
 
 	sn.Paths = append(sn.Paths, *routeObj)
+}
+
+func (sn *SuperNova) AddStatic(dir string) {
+	if sn.staticDirs == nil {
+		sn.staticDirs = make([]string, 0)
+	}
+
+	if _, err := os.Stat(dir); err == nil {
+		sn.staticDirs = append(sn.staticDirs, dir)
+	}
+}
+
+func (sn *SuperNova) serveStatic(req *Request) bool {
+	for i := range sn.staticDirs {
+		staticDir := sn.staticDirs[i]
+		path := staticDir + string(req.Ctx.Request.RequestURI())
+
+		//Remove all .. for security TODO: Allow if doesn't go above basedir
+		path = strings.Replace(path, "..", "", -1)
+
+		//If ends in / default to index.html
+		if strings.HasSuffix(path, "/") {
+			path += "index.html"
+		}
+
+		if _, err := os.Stat(path); err == nil {
+			sn.cachedStatic.mutex.Lock()
+			var cachedObj *CachedObj
+			cachedObj, ok := sn.cachedStatic.files[path]
+
+			if !ok || time.Now().Unix() - cachedObj.timeCached.Unix() > sn.maxCachedTime {
+				contents, err := ioutil.ReadFile(path)
+				if err != nil {
+					log.Println("unable to read file", err)
+				}
+				cachedObj = &CachedObj{data:contents, timeCached: time.Now()}
+				sn.cachedStatic.files[path] = cachedObj
+			}
+			sn.cachedStatic.mutex.Unlock()
+
+			if err != nil {
+				log.Println("Unable to read file")
+			}
+
+			//Set mime type
+			extensionParts := strings.Split(path, ".")
+			ext := extensionParts[len(extensionParts) - 1]
+			mType := mime.TypeByExtension("." + ext)
+
+			if mType != "" {
+				req.Ctx.Response.Header.Set("Content-Type", mType)
+			}
+
+			req.Send(cachedObj.data)
+			return true
+		}
+	}
+
+	return false
 }
