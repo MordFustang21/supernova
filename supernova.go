@@ -14,6 +14,7 @@ import (
 type SuperNova struct {
 	Paths         []Route
 	staticDirs    []string
+	middleWare    []MiddleWare
 	cachedStatic  *CachedStatic
 	maxCachedTime int64
 }
@@ -26,6 +27,11 @@ type CachedObj struct {
 type CachedStatic struct {
 	mutex sync.Mutex
 	files map[string]*CachedObj
+}
+
+//Middleware obj to hold functions
+type MiddleWare struct {
+	middleFunc func(*Request, func())
 }
 
 func Super() *SuperNova {
@@ -41,6 +47,13 @@ func (sn *SuperNova) Serve(addr string) {
 
 func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 	request := NewRequest(ctx)
+
+	//Run Middleware
+	finished := sn.runMiddleware(request)
+
+	if !finished {
+		return
+	}
 
 	pathParts := strings.Split(string(ctx.Request.RequestURI()), "/")
 	path := strings.Join(pathParts, "/")
@@ -158,4 +171,32 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 	}
 
 	return false
+}
+
+//Adds a new function to the middleware stack
+func (s *SuperNova) Use(f func(*Request, func())) {
+	if s.middleWare == nil {
+		s.middleWare = make([]MiddleWare, 0)
+	}
+	middle := new(MiddleWare)
+	middle.middleFunc = f
+	s.middleWare = append(s.middleWare, *middle)
+}
+
+//Internal method that runs the middleware
+func (s *SuperNova) runMiddleware(req *Request) bool {
+	stackFinished := true
+	for m := range s.middleWare {
+		nextCalled := false
+		s.middleWare[m].middleFunc(req, func() {
+			nextCalled = true
+		})
+
+		if !nextCalled {
+			stackFinished = false
+			break
+		}
+	}
+
+	return stackFinished
 }
