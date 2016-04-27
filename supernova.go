@@ -1,4 +1,4 @@
-package superNova
+package supernova
 
 import (
 	"github.com/valyala/fasthttp"
@@ -71,8 +71,7 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	println("Not found")
-	ctx.Error("not found", fasthttp.StatusNotFound)
+	ctx.Error("404 Not Found", fasthttp.StatusNotFound)
 }
 
 func (sn *SuperNova) AddRoute(route string, routeFunc func(*Request)) {

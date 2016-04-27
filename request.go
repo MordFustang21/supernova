@@ -1,4 +1,4 @@
-package superNova
+package supernova
 
 import (
 	"encoding/json"
