@@ -41,8 +41,8 @@ func Super() *SuperNova {
 	return s
 }
 
-func (sn *SuperNova) Serve(addr string) {
-	fasthttp.ListenAndServe(addr, sn.handler)
+func (sn *SuperNova) Serve(addr string) error {
+	return fasthttp.ListenAndServe(addr, sn.handler)
 }
 
 func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
