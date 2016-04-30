@@ -9,14 +9,17 @@ import (
 	"log"
 	"mime"
 	"sync"
+	"bytes"
+	"github.com/klauspost/compress/gzip"
 )
 
 type SuperNova struct {
-	Paths         []Route
-	staticDirs    []string
-	middleWare    []MiddleWare
-	cachedStatic  *CachedStatic
-	maxCachedTime int64
+	Paths              []Route
+	staticDirs         []string
+	middleWare         []MiddleWare
+	cachedStatic       *CachedStatic
+	maxCachedTime      int64
+	compressionEnabled bool
 }
 
 type CachedObj struct {
@@ -124,6 +127,10 @@ func (sn *SuperNova) AddStatic(dir string) {
 	}
 }
 
+func (sn *SuperNova) EnableGzip(value bool) {
+	sn.compressionEnabled = value
+}
+
 func (sn *SuperNova) serveStatic(req *Request) bool {
 	for i := range sn.staticDirs {
 		staticDir := sn.staticDirs[i]
@@ -147,9 +154,17 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 				if err != nil {
 					log.Println("unable to read file", err)
 				}
+				if sn.compressionEnabled {
+					var b bytes.Buffer
+					w := gzip.NewWriter(&b)
+					w.Write(contents)
+					w.Close()
+					contents = b.Bytes()
+				}
 				cachedObj = &CachedObj{data:contents, timeCached: time.Now()}
 				sn.cachedStatic.files[path] = cachedObj
 			}
+
 			sn.cachedStatic.mutex.Unlock()
 
 			if err != nil {
@@ -165,11 +180,14 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 				req.Ctx.Response.Header.Set("Content-Type", mType)
 			}
 
+			if sn.compressionEnabled {
+				req.Ctx.Response.Header.Set("Content-Encoding", "gzip")
+			}
+
 			req.Send(cachedObj.data)
 			return true
 		}
 	}
-
 	return false
 }
 
