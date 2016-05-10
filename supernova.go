@@ -127,6 +127,10 @@ func (sn *SuperNova) AddStatic(dir string) {
 	}
 }
 
+func (sn *SuperNova) SetCacheTimeout(seconds int64) {
+	sn.maxCachedTime = seconds
+}
+
 func (sn *SuperNova) EnableGzip(value bool) {
 	sn.compressionEnabled = value
 }
