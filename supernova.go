@@ -10,7 +10,7 @@ import (
 	"mime"
 	"sync"
 	"bytes"
-	"github.com/klauspost/compress/gzip"
+	"compress/gzip"
 )
 
 type SuperNova struct {
@@ -158,13 +158,6 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 				if err != nil {
 					log.Println("unable to read file", err)
 				}
-				if sn.compressionEnabled {
-					var b bytes.Buffer
-					w := gzip.NewWriter(&b)
-					w.Write(contents)
-					w.Close()
-					contents = b.Bytes()
-				}
 				cachedObj = &CachedObj{data:contents, timeCached: time.Now()}
 				sn.cachedStatic.files[path] = cachedObj
 			}
@@ -185,6 +178,11 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 			}
 
 			if sn.compressionEnabled {
+				var b bytes.Buffer
+				w := gzip.NewWriter(&b)
+				w.Write(cachedObj.data)
+				w.Close()
+				cachedObj.data = b.Bytes()
 				req.Ctx.Response.Header.Set("Content-Encoding", "gzip")
 			}
 
