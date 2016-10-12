@@ -18,7 +18,7 @@ type SuperNova struct {
 	GetPaths           []Route
 	PostPaths          []Route
 	PutPaths           []Route
-	Deletepaths        []Route
+	DeletePaths        []Route
 	staticDirs         []string
 	middleWare         []MiddleWare
 	cachedStatic       *CachedStatic
@@ -65,7 +65,39 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 	pathParts := strings.Split(string(ctx.Request.RequestURI()), "/")
 	path := strings.Join(pathParts, "/")
 
-	for _ = range pathParts {
+	var lookupPaths []Route
+
+	for range pathParts {
+		switch string(request.Ctx.Method()) {
+		case "GET":
+			lookupPaths = sn.GetPaths
+			break;
+		case "PUT":
+			lookupPaths = sn.PutPaths
+			break;
+		case "POST":
+			lookupPaths = sn.PostPaths
+			break;
+		case "DELETE":
+			lookupPaths = sn.DeletePaths
+			break;
+		}
+
+		for routeIndex := range lookupPaths {
+			route := lookupPaths[routeIndex]
+			if route.route == path || route.route == path + "/" {
+				route.rq = request
+
+				//Prepare data for call
+				route.prepare()
+
+				//Call user handler
+				route.call()
+				return
+			}
+		}
+
+		//TODO: Remove duplicate code
 		for routeIndex := range sn.Paths {
 			route := sn.Paths[routeIndex]
 			if route.route == path || route.route == path + "/" {
@@ -94,7 +126,7 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 	ctx.Error("404 Not Found", fasthttp.StatusNotFound)
 }
 
-func (sn *SuperNova) AddRoute(route string, routeFunc func(*Request)) {
+func (sn *SuperNova) All(route string, routeFunc func(*Request)) {
 
 	if sn.Paths == nil {
 		sn.Paths = make([]Route, 0)
@@ -128,11 +160,11 @@ func (sn *SuperNova) Put(route string, routeFunc func(*Request)) {
 }
 
 func (sn *SuperNova) Delete(route string, routeFunc func(*Request)) {
-	if sn.Deletepaths == nil {
-		sn.Deletepaths = make([]Route, 0)
+	if sn.DeletePaths == nil {
+		sn.DeletePaths = make([]Route, 0)
 	}
 
-	sn.Deletepaths = append(sn.Deletepaths, *buildRoute(route, routeFunc))
+	sn.DeletePaths = append(sn.DeletePaths, *buildRoute(route, routeFunc))
 }
 
 func buildRoute(route string, routeFunc func(*Request)) *Route {

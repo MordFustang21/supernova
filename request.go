@@ -52,3 +52,7 @@ func (r *Request) SendJson(obj interface{}) error {
 	return nil
 }
 
+func (r *Request) GetMethod() string {
+	return string(r.Ctx.Method())
+}
+
