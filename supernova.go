@@ -15,6 +15,10 @@ import (
 
 type SuperNova struct {
 	Paths              []Route
+	GetPaths           []Route
+	PostPaths          []Route
+	PutPaths           []Route
+	Deletepaths        []Route
 	staticDirs         []string
 	middleWare         []MiddleWare
 	cachedStatic       *CachedStatic
@@ -91,7 +95,47 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 }
 
 func (sn *SuperNova) AddRoute(route string, routeFunc func(*Request)) {
-	//Build route and assign function
+
+	if sn.Paths == nil {
+		sn.Paths = make([]Route, 0)
+	}
+
+	sn.Paths = append(sn.Paths, *buildRoute(route, routeFunc))
+}
+
+func (sn *SuperNova) Get(route string, routeFunc func(*Request)) {
+	if sn.GetPaths == nil {
+		sn.GetPaths = make([]Route, 0)
+	}
+
+	sn.GetPaths = append(sn.GetPaths, *buildRoute(route, routeFunc))
+}
+
+func (sn *SuperNova) Post(route string, routeFunc func(*Request)) {
+	if sn.PostPaths == nil {
+		sn.PostPaths = make([]Route, 0)
+	}
+
+	sn.PostPaths = append(sn.PostPaths, *buildRoute(route, routeFunc))
+}
+
+func (sn *SuperNova) Put(route string, routeFunc func(*Request)) {
+	if sn.PutPaths == nil {
+		sn.PutPaths = make([]Route, 0)
+	}
+
+	sn.PutPaths = append(sn.PutPaths, *buildRoute(route, routeFunc))
+}
+
+func (sn *SuperNova) Delete(route string, routeFunc func(*Request)) {
+	if sn.Deletepaths == nil {
+		sn.Deletepaths = make([]Route, 0)
+	}
+
+	sn.Deletepaths = append(sn.Deletepaths, *buildRoute(route, routeFunc))
+}
+
+func buildRoute(route string, routeFunc func(*Request)) *Route {
 	routeObj := new(Route)
 	routeObj.routeFunc = routeFunc
 
@@ -110,11 +154,7 @@ func (sn *SuperNova) AddRoute(route string, routeFunc func(*Request)) {
 
 	routeObj.route = baseDir
 
-	if sn.Paths == nil {
-		sn.Paths = make([]Route, 0)
-	}
-
-	sn.Paths = append(sn.Paths, *routeObj)
+	return routeObj
 }
 
 func (sn *SuperNova) AddStatic(dir string) {
