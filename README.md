@@ -1,7 +1,7 @@
-# Nova
+# Supernova
 An express like framework for go web servers
 
-Provides a lot of the same methods and functionality as express.js
+Provides a lot of the same methods and functionality as Expressjs
 
 Example
 ```go
