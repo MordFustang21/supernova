@@ -14,11 +14,11 @@ import (
 )
 
 type SuperNova struct {
-	Paths              []Route
-	GetPaths           []Route
-	PostPaths          []Route
-	PutPaths           []Route
-	DeletePaths        []Route
+	Paths              map[string]Route
+	GetPaths           map[string]Route
+	PostPaths          map[string]Route
+	PutPaths           map[string]Route
+	DeletePaths        map[string]Route
 	staticDirs         []string
 	middleWare         []MiddleWare
 	cachedStatic       *CachedStatic
@@ -65,7 +65,7 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 	pathParts := strings.Split(string(ctx.Request.RequestURI()), "/")
 	path := strings.Join(pathParts, "/")
 
-	var lookupPaths []Route
+	var lookupPaths map[string]Route
 
 	for range pathParts {
 		switch string(request.Ctx.Method()) {
@@ -83,33 +83,30 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 			break;
 		}
 
-		for routeIndex := range lookupPaths {
-			route := lookupPaths[routeIndex]
-			if route.route == path || route.route == path + "/" {
-				route.rq = request
+		route, ok := lookupPaths[path]
+		if ok {
+			route.rq = request
 
-				//Prepare data for call
-				route.prepare()
+			//Prepare data for call
+			route.prepare()
 
-				//Call user handler
-				route.call()
-				return
-			}
+			//Call user handler
+			route.call()
+			return
 		}
 
+
 		//TODO: Remove duplicate code
-		for routeIndex := range sn.Paths {
-			route := sn.Paths[routeIndex]
-			if route.route == path || route.route == path + "/" {
-				route.rq = request
+		route, ok = sn.Paths[path]
+		if ok {
+			route.rq = request
 
-				//Prepare data for call
-				route.prepare()
+			//Prepare data for call
+			route.prepare()
 
-				//Call user handler
-				route.call()
-				return
-			}
+			//Call user handler
+			route.call()
+			return
 		}
 
 		_, pathParts = pathParts[len(pathParts) - 1], pathParts[:len(pathParts) - 1]
@@ -129,45 +126,51 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 func (sn *SuperNova) All(route string, routeFunc func(*Request)) {
 
 	if sn.Paths == nil {
-		sn.Paths = make([]Route, 0)
+		sn.Paths = make(map[string]Route, 0)
 	}
 
-	sn.Paths = append(sn.Paths, *buildRoute(route, routeFunc))
+	routeObj := buildRoute(route, routeFunc)
+	sn.Paths[routeObj.route] = routeObj
 }
 
 func (sn *SuperNova) Get(route string, routeFunc func(*Request)) {
 	if sn.GetPaths == nil {
-		sn.GetPaths = make([]Route, 0)
+		sn.GetPaths = make(map[string]Route)
 	}
 
-	sn.GetPaths = append(sn.GetPaths, *buildRoute(route, routeFunc))
+	routeObj := buildRoute(route, routeFunc)
+	println("Adding Route: " + routeObj.route)
+	sn.GetPaths[routeObj.route] = routeObj
 }
 
 func (sn *SuperNova) Post(route string, routeFunc func(*Request)) {
 	if sn.PostPaths == nil {
-		sn.PostPaths = make([]Route, 0)
+		sn.PostPaths = make(map[string]Route)
 	}
 
-	sn.PostPaths = append(sn.PostPaths, *buildRoute(route, routeFunc))
+	routeObj := buildRoute(route, routeFunc)
+	sn.PostPaths[routeObj.route] = routeObj
 }
 
 func (sn *SuperNova) Put(route string, routeFunc func(*Request)) {
 	if sn.PutPaths == nil {
-		sn.PutPaths = make([]Route, 0)
+		sn.PutPaths = make(map[string]Route)
 	}
 
-	sn.PutPaths = append(sn.PutPaths, *buildRoute(route, routeFunc))
+	routeObj := buildRoute(route, routeFunc)
+	sn.PutPaths[routeObj.route] = routeObj
 }
 
 func (sn *SuperNova) Delete(route string, routeFunc func(*Request)) {
 	if sn.DeletePaths == nil {
-		sn.DeletePaths = make([]Route, 0)
+		sn.DeletePaths = make(map[string]Route)
 	}
 
-	sn.DeletePaths = append(sn.DeletePaths, *buildRoute(route, routeFunc))
+	routeObj := buildRoute(route, routeFunc)
+	sn.DeletePaths[routeObj.route] = routeObj
 }
 
-func buildRoute(route string, routeFunc func(*Request)) *Route {
+func buildRoute(route string, routeFunc func(*Request)) Route {
 	routeObj := new(Route)
 	routeObj.routeFunc = routeFunc
 
@@ -184,9 +187,9 @@ func buildRoute(route string, routeFunc func(*Request)) *Route {
 		}
 	}
 
-	routeObj.route = baseDir
+	routeObj.route = strings.TrimSuffix(baseDir, "/")
 
-	return routeObj
+	return *routeObj
 }
 
 func (sn *SuperNova) AddStatic(dir string) {
