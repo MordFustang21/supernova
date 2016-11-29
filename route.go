@@ -13,7 +13,7 @@ type Route struct {
 
 func (r *Route) buildRouteParams() {
 	routeParams := make(map[string]string)
-	pathParts := strings.Split(string(r.rq.Ctx.Request.RequestURI()), "/")
+	pathParts := strings.Split(string(r.rq.Request.RequestURI()), "/")
 
 	for i := range r.routeParamsIndex {
 		name := r.routeParamsIndex[i]
@@ -32,3 +32,4 @@ func (r *Route) prepare() {
 func (r *Route) call() {
 	r.routeFunc(r.rq)
 }
+

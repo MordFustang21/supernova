@@ -14,11 +14,11 @@ import (
 )
 
 type SuperNova struct {
-	Paths              map[string]Route
-	GetPaths           map[string]Route
-	PostPaths          map[string]Route
-	PutPaths           map[string]Route
-	DeletePaths        map[string]Route
+	paths              map[string]Route
+	getPaths           map[string]Route
+	postPaths          map[string]Route
+	putPaths           map[string]Route
+	deletePaths        map[string]Route
 	staticDirs         []string
 	middleWare         []MiddleWare
 	cachedStatic       *CachedStatic
@@ -68,18 +68,18 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 	var lookupPaths map[string]Route
 
 	for range pathParts {
-		switch string(request.Ctx.Method()) {
+		switch string(request.Method()) {
 		case "GET":
-			lookupPaths = sn.GetPaths
+			lookupPaths = sn.getPaths
 			break;
 		case "PUT":
-			lookupPaths = sn.PutPaths
+			lookupPaths = sn.putPaths
 			break;
 		case "POST":
-			lookupPaths = sn.PostPaths
+			lookupPaths = sn.postPaths
 			break;
 		case "DELETE":
-			lookupPaths = sn.DeletePaths
+			lookupPaths = sn.deletePaths
 			break;
 		}
 
@@ -97,7 +97,7 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 
 
 		//TODO: Remove duplicate code
-		route, ok = sn.Paths[path]
+		route, ok = sn.paths[path]
 		if ok {
 			route.rq = request
 
@@ -125,49 +125,49 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 
 func (sn *SuperNova) All(route string, routeFunc func(*Request)) {
 
-	if sn.Paths == nil {
-		sn.Paths = make(map[string]Route, 0)
+	if sn.paths == nil {
+		sn.paths = make(map[string]Route, 0)
 	}
 
 	routeObj := buildRoute(route, routeFunc)
-	sn.Paths[routeObj.route] = routeObj
+	sn.paths[routeObj.route] = routeObj
 }
 
 func (sn *SuperNova) Get(route string, routeFunc func(*Request)) {
-	if sn.GetPaths == nil {
-		sn.GetPaths = make(map[string]Route)
+	if sn.getPaths == nil {
+		sn.getPaths = make(map[string]Route)
 	}
 
 	routeObj := buildRoute(route, routeFunc)
 	println("Adding Route: " + routeObj.route)
-	sn.GetPaths[routeObj.route] = routeObj
+	sn.getPaths[routeObj.route] = routeObj
 }
 
 func (sn *SuperNova) Post(route string, routeFunc func(*Request)) {
-	if sn.PostPaths == nil {
-		sn.PostPaths = make(map[string]Route)
+	if sn.postPaths == nil {
+		sn.postPaths = make(map[string]Route)
 	}
 
 	routeObj := buildRoute(route, routeFunc)
-	sn.PostPaths[routeObj.route] = routeObj
+	sn.postPaths[routeObj.route] = routeObj
 }
 
 func (sn *SuperNova) Put(route string, routeFunc func(*Request)) {
-	if sn.PutPaths == nil {
-		sn.PutPaths = make(map[string]Route)
+	if sn.putPaths == nil {
+		sn.putPaths = make(map[string]Route)
 	}
 
 	routeObj := buildRoute(route, routeFunc)
-	sn.PutPaths[routeObj.route] = routeObj
+	sn.putPaths[routeObj.route] = routeObj
 }
 
 func (sn *SuperNova) Delete(route string, routeFunc func(*Request)) {
-	if sn.DeletePaths == nil {
-		sn.DeletePaths = make(map[string]Route)
+	if sn.deletePaths == nil {
+		sn.deletePaths = make(map[string]Route)
 	}
 
 	routeObj := buildRoute(route, routeFunc)
-	sn.DeletePaths[routeObj.route] = routeObj
+	sn.deletePaths[routeObj.route] = routeObj
 }
 
 func buildRoute(route string, routeFunc func(*Request)) Route {
@@ -213,7 +213,7 @@ func (sn *SuperNova) EnableGzip(value bool) {
 func (sn *SuperNova) serveStatic(req *Request) bool {
 	for i := range sn.staticDirs {
 		staticDir := sn.staticDirs[i]
-		path := staticDir + string(req.Ctx.Request.RequestURI())
+		path := staticDir + string(req.Request.RequestURI())
 
 		//Remove all .. for security TODO: Allow if doesn't go above basedir
 		path = strings.Replace(path, "..", "", -1)
@@ -249,7 +249,7 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 			mType := mime.TypeByExtension("." + ext)
 
 			if mType != "" {
-				req.Ctx.Response.Header.Set("Content-Type", mType)
+				req.Response.Header.Set("Content-Type", mType)
 			}
 
 			if sn.compressionEnabled {
@@ -258,7 +258,7 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 				w.Write(cachedObj.data)
 				w.Close()
 				cachedObj.data = b.Bytes()
-				req.Ctx.Response.Header.Set("Content-Encoding", "gzip")
+				req.Response.Header.Set("Content-Encoding", "gzip")
 			}
 
 			req.Send(cachedObj.data)

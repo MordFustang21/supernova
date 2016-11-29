@@ -8,17 +8,16 @@ import (
 )
 
 type Request struct {
-	Ctx         *fasthttp.RequestCtx
+	*fasthttp.RequestCtx
 	RouteParams map[string]string
 	Body        []byte
 }
 
 func NewRequest(ctx *fasthttp.RequestCtx) *Request {
-	request := new(Request)
-	request.Ctx = ctx
+	request := Request{ctx, make(map[string]string), make([]byte, 0)}
 	request.Body = ctx.Request.Body()
 
-	return request
+	return &request
 }
 
 func (r *Request) Json(i interface{}) error {
@@ -32,10 +31,10 @@ func (r *Request) Json(i interface{}) error {
 func (r *Request) Send(data interface{}) {
 	switch v := data.(type) {
 	case []byte:
-		r.Ctx.Write(v)
+		r.Write(v)
 		break;
 	case string:
-		r.Ctx.Write([]byte(v))
+		r.Write([]byte(v))
 		break;
 	}
 }
@@ -46,13 +45,12 @@ func (r *Request) SendJson(obj interface{}) error {
 		log.Println(err)
 		return err
 	} else {
-		r.Ctx.Response.Header.Set("Content-Type", "application/json")
-		r.Ctx.Write(json)
+		r.Response.Header.Set("Content-Type", "application/json")
+		r.Write(json)
 	}
 	return nil
 }
 
 func (r *Request) GetMethod() string {
-	return string(r.Ctx.Method())
+	return string(r.Method())
 }
-
