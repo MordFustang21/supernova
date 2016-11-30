@@ -139,7 +139,6 @@ func (sn *SuperNova) Get(route string, routeFunc func(*Request)) {
 	}
 
 	routeObj := buildRoute(route, routeFunc)
-	println("Adding Route: " + routeObj.route)
 	sn.getPaths[routeObj.route] = routeObj
 }
 

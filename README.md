@@ -8,41 +8,50 @@ Provides a lot of the same methods and functionality as Expressjs
 
 Example
 ```go
-s := supernova.Super()
+package main
 
-//Static folder example
-s.AddStatic("/sitedir/")
-//If you want to cache a file (seconds)
-s.SetCacheTimeout(5)
+import (
+	"log"
+	"github.com/MordFustang21/supernova"
+)
 
-//Middleware Example
-s.Use(func(req *supernova.Request, next func()) {
-    res.R.Header().Set("Powered-By", "Nova")
-    next()
-})
+func main() {
+	s := supernova.Super()
 
-//Route Examples
-s.Get("/test/taco/:apple", func(req *supernova.Request) {
-    type test struct {
-        Apple string
-    }
+	//Static folder example
+	s.AddStatic("/sitedir/")
+	//If you want to cache a file (seconds)
+	s.SetCacheTimeout(5)
 
-    testS := test{}
-    err := req.Json(&testS)
-    if err != nil {
-        log.Println(err)
-    }
-    res.Send("Received Taco")
-});
+	//Middleware Example
+	s.Use(func(req *supernova.Request, next func()) {
+		req.Response.Header.Set("Powered-By", "supernova")
+		next()
+	})
 
-s.Get("/test/:taco/:apple", func(req *supernova.Request) {
-    res.Json(req.RouteParams)
-});
+	//Route Examples
+	s.Get("/test/taco/:apple", func(req *supernova.Request) {
+		type test struct {
+			Apple string
+		}
 
-err := s.Serve(":8080")
+		testS := test{}
+		err := req.Json(&testS)
+		if err != nil {
+			log.Println(err)
+		}
+		req.Send("Received data")
+	});
 
-if err != nil {
-    log.Fatal(err)
+	s.Get("/test/:taco/:apple", func(req *supernova.Request) {
+		req.Json(req.RouteParams)
+	});
+
+	err := s.Serve(":8080")
+
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 ```
 # Todo:
