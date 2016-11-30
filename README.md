@@ -1,4 +1,7 @@
 # Supernova
+[![GoDoc](https://godoc.org/github.com/MordFustang21/supernova?status.svg)](https://godoc.org/github.com/MordFustang21/supernova)
+[![Build Status](https://travis-ci.org/MordFustang21/supernova.svg?branch=master)](https://travis-ci.org/MordFustang21/supernova)
+
 An express like framework for go web servers
 
 Provides a lot of the same methods and functionality as Expressjs
