@@ -1,16 +1,16 @@
 package supernova
 
 import (
+	"bytes"
+	"compress/gzip"
 	"github.com/valyala/fasthttp"
-	"strings"
-	"os"
-	"time"
 	"io/ioutil"
 	"log"
 	"mime"
+	"os"
+	"strings"
 	"sync"
-	"bytes"
-	"compress/gzip"
+	"time"
 )
 
 type SuperNova struct {
@@ -71,16 +71,16 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 		switch string(request.Method()) {
 		case "GET":
 			lookupPaths = sn.getPaths
-			break;
+			break
 		case "PUT":
 			lookupPaths = sn.putPaths
-			break;
+			break
 		case "POST":
 			lookupPaths = sn.postPaths
-			break;
+			break
 		case "DELETE":
 			lookupPaths = sn.deletePaths
-			break;
+			break
 		}
 
 		route, ok := lookupPaths[path]
@@ -95,7 +95,6 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 			return
 		}
 
-
 		//TODO: Remove duplicate code
 		route, ok = sn.paths[path]
 		if ok {
@@ -109,7 +108,7 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 			return
 		}
 
-		_, pathParts = pathParts[len(pathParts) - 1], pathParts[:len(pathParts) - 1]
+		_, pathParts = pathParts[len(pathParts)-1], pathParts[:len(pathParts)-1]
 		path = strings.Join(pathParts, "/")
 	}
 
@@ -227,12 +226,12 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 			var cachedObj *CachedObj
 			cachedObj, ok := sn.cachedStatic.files[path]
 
-			if !ok || time.Now().Unix() - cachedObj.timeCached.Unix() > sn.maxCachedTime {
+			if !ok || time.Now().Unix()-cachedObj.timeCached.Unix() > sn.maxCachedTime {
 				contents, err := ioutil.ReadFile(path)
 				if err != nil {
 					log.Println("unable to read file", err)
 				}
-				cachedObj = &CachedObj{data:contents, timeCached: time.Now()}
+				cachedObj = &CachedObj{data: contents, timeCached: time.Now()}
 				sn.cachedStatic.files[path] = cachedObj
 			}
 
@@ -244,7 +243,7 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 
 			//Set mime type
 			extensionParts := strings.Split(path, ".")
-			ext := extensionParts[len(extensionParts) - 1]
+			ext := extensionParts[len(extensionParts)-1]
 			mType := mime.TypeByExtension("." + ext)
 
 			if mType != "" {

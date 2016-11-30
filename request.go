@@ -32,10 +32,10 @@ func (r *Request) Send(data interface{}) {
 	switch v := data.(type) {
 	case []byte:
 		r.Write(v)
-		break;
+		break
 	case string:
 		r.Write([]byte(v))
-		break;
+		break
 	}
 }
 

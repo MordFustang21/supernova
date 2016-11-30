@@ -17,7 +17,7 @@ func (r *Route) buildRouteParams() {
 
 	for i := range r.routeParamsIndex {
 		name := r.routeParamsIndex[i]
-		if i <= len(pathParts) - 1 {
+		if i <= len(pathParts)-1 {
 			routeParams[name] = pathParts[i]
 		}
 	}
@@ -32,4 +32,3 @@ func (r *Route) prepare() {
 func (r *Route) call() {
 	r.routeFunc(r.rq)
 }
-
