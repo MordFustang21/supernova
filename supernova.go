@@ -7,6 +7,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"bytes"
+	"github.com/klauspost/compress/gzip"
+	"io/ioutil"
 )
 
 type SuperNova struct {
@@ -213,7 +216,7 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 			path += "index.html"
 		}
 
-		if _, err := os.Stat(path); err == nil {
+		if stat, err := os.Stat(path); err == nil {
 			//Set mime type
 			extensionParts := strings.Split(path, ".")
 			ext := extensionParts[len(extensionParts)-1]
@@ -223,11 +226,23 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 				req.Response.Header.Set("Content-Type", mType)
 			}
 
-			if sn.compressionEnabled {
+			if sn.compressionEnabled && stat.Size() < 10000000 {
+				var b bytes.Buffer
+				writer := gzip.NewWriter(&b)
+
+				data, err := ioutil.ReadFile(path)
+				if err != nil {
+					println("Unable to read: " + err.Error())
+				}
+
+				writer.Write(data)
+				writer.Close()
 				req.Response.Header.Set("Content-Encoding", "gzip")
+				req.Send(b.String())
+			} else {
+				req.Response.SendFile(path)
 			}
 
-			req.Response.SendFile(path)
 			return true
 		}
 	}
