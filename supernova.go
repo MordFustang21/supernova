@@ -1,9 +1,7 @@
 package supernova
 
 import (
-	"bufio"
 	"github.com/valyala/fasthttp"
-	"log"
 	"mime"
 	"os"
 	"strings"
@@ -216,10 +214,6 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 		}
 
 		if _, err := os.Stat(path); err == nil {
-			if err != nil {
-				log.Println("Unable to read file")
-			}
-
 			//Set mime type
 			extensionParts := strings.Split(path, ".")
 			ext := extensionParts[len(extensionParts)-1]
@@ -229,21 +223,11 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 				req.Response.Header.Set("Content-Type", mType)
 			}
 
-			//if sn.compressionEnabled {
-			//	var b bytes.Buffer
-			//	w := gzip.NewWriter(&b)
-			//	w.Write(cachedObj.data)
-			//	w.Close()
-			//	cachedObj.data = b.Bytes()
-			//	req.Response.Header.Set("Content-Encoding", "gzip")
-			//}
-
-			file, err := os.Open(path)
-			if err != nil {
-				println(err.Error())
+			if sn.compressionEnabled {
+				req.Response.Header.Set("Content-Encoding", "gzip")
 			}
-			writer := bufio.NewWriter(file)
-			req.Response.Write(writer)
+
+			req.Response.SendFile(path)
 			return true
 		}
 	}
