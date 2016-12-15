@@ -1,10 +1,8 @@
 package supernova
 
 import (
-	"bytes"
-	"compress/gzip"
+	"bufio"
 	"github.com/valyala/fasthttp"
-	"io/ioutil"
 	"log"
 	"mime"
 	"os"
@@ -200,10 +198,6 @@ func (sn *SuperNova) AddStatic(dir string) {
 	}
 }
 
-func (sn *SuperNova) SetCacheTimeout(seconds int64) {
-	sn.maxCachedTime = seconds
-}
-
 func (sn *SuperNova) EnableGzip(value bool) {
 	sn.compressionEnabled = value
 }
@@ -222,21 +216,6 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 		}
 
 		if _, err := os.Stat(path); err == nil {
-			sn.cachedStatic.mutex.Lock()
-			var cachedObj *CachedObj
-			cachedObj, ok := sn.cachedStatic.files[path]
-
-			if !ok || time.Now().Unix()-cachedObj.timeCached.Unix() > sn.maxCachedTime {
-				contents, err := ioutil.ReadFile(path)
-				if err != nil {
-					log.Println("unable to read file", err)
-				}
-				cachedObj = &CachedObj{data: contents, timeCached: time.Now()}
-				sn.cachedStatic.files[path] = cachedObj
-			}
-
-			sn.cachedStatic.mutex.Unlock()
-
 			if err != nil {
 				log.Println("Unable to read file")
 			}
@@ -250,16 +229,21 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 				req.Response.Header.Set("Content-Type", mType)
 			}
 
-			if sn.compressionEnabled {
-				var b bytes.Buffer
-				w := gzip.NewWriter(&b)
-				w.Write(cachedObj.data)
-				w.Close()
-				cachedObj.data = b.Bytes()
-				req.Response.Header.Set("Content-Encoding", "gzip")
-			}
+			//if sn.compressionEnabled {
+			//	var b bytes.Buffer
+			//	w := gzip.NewWriter(&b)
+			//	w.Write(cachedObj.data)
+			//	w.Close()
+			//	cachedObj.data = b.Bytes()
+			//	req.Response.Header.Set("Content-Encoding", "gzip")
+			//}
 
-			req.Send(cachedObj.data)
+			file, err := os.Open(path)
+			if err != nil {
+				println(err.Error())
+			}
+			writer := bufio.NewWriter(file)
+			req.Response.Write(writer)
 			return true
 		}
 	}
