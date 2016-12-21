@@ -1,14 +1,15 @@
 package supernova
 
 import (
-	"bufio"
 	"github.com/valyala/fasthttp"
-	"log"
 	"mime"
 	"os"
 	"strings"
 	"sync"
 	"time"
+	"bytes"
+	"github.com/klauspost/compress/gzip"
+	"io/ioutil"
 )
 
 type SuperNova struct {
@@ -215,11 +216,7 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 			path += "index.html"
 		}
 
-		if _, err := os.Stat(path); err == nil {
-			if err != nil {
-				log.Println("Unable to read file")
-			}
-
+		if stat, err := os.Stat(path); err == nil {
 			//Set mime type
 			extensionParts := strings.Split(path, ".")
 			ext := extensionParts[len(extensionParts)-1]
@@ -229,21 +226,23 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 				req.Response.Header.Set("Content-Type", mType)
 			}
 
-			//if sn.compressionEnabled {
-			//	var b bytes.Buffer
-			//	w := gzip.NewWriter(&b)
-			//	w.Write(cachedObj.data)
-			//	w.Close()
-			//	cachedObj.data = b.Bytes()
-			//	req.Response.Header.Set("Content-Encoding", "gzip")
-			//}
+			if sn.compressionEnabled && stat.Size() < 10000000 {
+				var b bytes.Buffer
+				writer := gzip.NewWriter(&b)
 
-			file, err := os.Open(path)
-			if err != nil {
-				println(err.Error())
+				data, err := ioutil.ReadFile(path)
+				if err != nil {
+					println("Unable to read: " + err.Error())
+				}
+
+				writer.Write(data)
+				writer.Close()
+				req.Response.Header.Set("Content-Encoding", "gzip")
+				req.Send(b.String())
+			} else {
+				req.Response.SendFile(path)
 			}
-			writer := bufio.NewWriter(file)
-			req.Response.Write(writer)
+
 			return true
 		}
 	}
