@@ -12,8 +12,8 @@ type Route struct {
 }
 
 func (r *Route) buildRouteParams() {
-	routeParams := make(map[string]string)
-	pathParts := strings.Split(string(r.rq.Request.RequestURI()), "/")
+	routeParams := r.rq.RouteParams
+	pathParts := strings.Split(r.rq.BaseUrl, "/")
 
 	for i := range r.routeParamsIndex {
 		name := r.routeParamsIndex[i]
@@ -21,8 +21,6 @@ func (r *Route) buildRouteParams() {
 			routeParams[name] = pathParts[i]
 		}
 	}
-
-	r.rq.RouteParams = routeParams
 }
 
 func (r *Route) prepare() {
