@@ -1,15 +1,16 @@
 package supernova
 
 import (
+	"bytes"
+	"context"
+	"github.com/klauspost/compress/gzip"
 	"github.com/valyala/fasthttp"
+	"io/ioutil"
 	"mime"
 	"os"
 	"strings"
 	"sync"
 	"time"
-	"bytes"
-	"github.com/klauspost/compress/gzip"
-	"io/ioutil"
 )
 
 type SuperNova struct {
@@ -121,7 +122,7 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 	ctx.Error("404 Not Found", fasthttp.StatusNotFound)
 }
 
-func (sn *SuperNova) All(route string, routeFunc func(*Request)) {
+func (sn *SuperNova) All(route string, routeFunc func(context.Context, *Request)) {
 
 	if sn.paths == nil {
 		sn.paths = make(map[string]Route, 0)
@@ -131,7 +132,7 @@ func (sn *SuperNova) All(route string, routeFunc func(*Request)) {
 	sn.paths[routeObj.route] = routeObj
 }
 
-func (sn *SuperNova) Get(route string, routeFunc func(*Request)) {
+func (sn *SuperNova) Get(route string, routeFunc func(context.Context, *Request)) {
 	if sn.getPaths == nil {
 		sn.getPaths = make(map[string]Route)
 	}
@@ -140,7 +141,7 @@ func (sn *SuperNova) Get(route string, routeFunc func(*Request)) {
 	sn.getPaths[routeObj.route] = routeObj
 }
 
-func (sn *SuperNova) Post(route string, routeFunc func(*Request)) {
+func (sn *SuperNova) Post(route string, routeFunc func(context.Context, *Request)) {
 	if sn.postPaths == nil {
 		sn.postPaths = make(map[string]Route)
 	}
@@ -149,7 +150,7 @@ func (sn *SuperNova) Post(route string, routeFunc func(*Request)) {
 	sn.postPaths[routeObj.route] = routeObj
 }
 
-func (sn *SuperNova) Put(route string, routeFunc func(*Request)) {
+func (sn *SuperNova) Put(route string, routeFunc func(context.Context, *Request)) {
 	if sn.putPaths == nil {
 		sn.putPaths = make(map[string]Route)
 	}
@@ -158,7 +159,7 @@ func (sn *SuperNova) Put(route string, routeFunc func(*Request)) {
 	sn.putPaths[routeObj.route] = routeObj
 }
 
-func (sn *SuperNova) Delete(route string, routeFunc func(*Request)) {
+func (sn *SuperNova) Delete(route string, routeFunc func(context.Context, *Request)) {
 	if sn.deletePaths == nil {
 		sn.deletePaths = make(map[string]Route)
 	}
@@ -167,7 +168,7 @@ func (sn *SuperNova) Delete(route string, routeFunc func(*Request)) {
 	sn.deletePaths[routeObj.route] = routeObj
 }
 
-func buildRoute(route string, routeFunc func(*Request)) Route {
+func buildRoute(route string, routeFunc func(context.Context, *Request)) Route {
 	routeObj := new(Route)
 	routeObj.routeFunc = routeFunc
 

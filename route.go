@@ -1,12 +1,13 @@
 package supernova
 
 import (
+	"context"
 	"strings"
 )
 
 type Route struct {
 	rq               *Request
-	routeFunc        func(*Request)
+	routeFunc        func(context.Context, *Request)
 	routeParamsIndex map[int]string
 	route            string
 }
@@ -28,5 +29,5 @@ func (r *Route) prepare() {
 }
 
 func (r *Route) call() {
-	r.routeFunc(r.rq)
+	r.routeFunc(context.Background(), r.rq)
 }
