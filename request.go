@@ -6,6 +6,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"log"
 	"strings"
+	"context"
 )
 
 type Request struct {
@@ -13,10 +14,11 @@ type Request struct {
 	RouteParams map[string]string
 	Body        []byte
 	BaseUrl     string
+	ctx context.Context
 }
 
 func NewRequest(ctx *fasthttp.RequestCtx) *Request {
-	request := Request{ctx, make(map[string]string), make([]byte, 0), ""}
+	request := Request{ctx, make(map[string]string), make([]byte, 0), "", context.Background()}
 	request.Body = ctx.Request.Body()
 
 	request.buildUrlParams()
