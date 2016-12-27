@@ -14,7 +14,7 @@ type Request struct {
 	RouteParams map[string]string
 	Body        []byte
 	BaseUrl     string
-	ctx context.Context
+	Ctx context.Context
 }
 
 func NewRequest(ctx *fasthttp.RequestCtx) *Request {
