@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/valyala/fasthttp"
+	"golang.org/x/net/context"
 	"log"
 	"strings"
-	"context"
 )
 
 type Request struct {
@@ -14,7 +14,7 @@ type Request struct {
 	RouteParams map[string]string
 	Body        []byte
 	BaseUrl     string
-	Ctx context.Context
+	Ctx         context.Context
 }
 
 func NewRequest(ctx *fasthttp.RequestCtx) *Request {
