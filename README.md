@@ -48,6 +48,17 @@ func main() {
 		req.Json(req.RouteParams)
 	});
 
+	// Websocket example
+	s.All("/ws", func(req *supernova.Request) {
+        err := upgrader.Upgrade(req, func(conn *supernova.Conn) {
+            conn.WriteMessage(supernova.TextMessage, []byte("Web socket success"))
+        })
+
+        if err != nil {
+            println("Error upgrading connection")
+        }
+    })
+
 	err := s.Serve(":8080")
 
 	if err != nil {
