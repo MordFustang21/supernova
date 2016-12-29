@@ -1,11 +1,15 @@
+// Copyright 2013 The Gorilla WebSocket Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package supernova
 
 import (
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
-	"github.com/valyala/fasthttp"
 	"io"
+	"net/http"
 	"strings"
 )
 
@@ -125,31 +129,17 @@ func nextTokenOrQuoted(s string) (value string, rest string) {
 
 // tokenListContainsValue returns true if the 1#token header with the given
 // name contains token.
-func tokenListContainsValue(header fasthttp.RequestHeader, name string, value string) bool {
-	s := string(header.Peek(name))
-	for {
-		var t string
-		t, s = nextToken(skipSpace(s))
-		if t == "" {
-			continue
-		}
-		s = skipSpace(s)
-		if s != "" && s[0] != ',' {
-			continue
-		}
-		if strings.EqualFold(t, value) {
+func tokenListContainsValue(list string, value string) bool {
+	for _, s := range strings.Split(list, ",") {
+		if strings.EqualFold(value, strings.TrimSpace(s)) {
 			return true
 		}
-		if s == "" {
-			continue
-		}
-		s = s[1:]
 	}
 	return false
 }
 
 // parseExtensiosn parses WebSocket extensions from a header.
-func parseExtensions(req *Request) []map[string]string {
+func parseExtensions(header http.Header) []map[string]string {
 
 	// From RFC 6455:
 	//
@@ -164,43 +154,52 @@ func parseExtensions(req *Request) []map[string]string {
 	//     ;'token' ABNF.
 
 	var result []map[string]string
-	s := string(req.Request.Header.Peek("Sec-Websocket-Extensions"))
-	for {
-		var t string
-		t, s = nextToken(skipSpace(s))
-		if t == "" {
-			continue
-		}
-		ext := map[string]string{"": t}
+headers:
+	for _, s := range header["Sec-Websocket-Extensions"] {
 		for {
-			s = skipSpace(s)
-			if !strings.HasPrefix(s, ";") {
-				break
+			var t string
+			t, s = nextToken(skipSpace(s))
+			if t == "" {
+				continue headers
 			}
-			var k string
-			k, s = nextToken(skipSpace(s[1:]))
-			if k == "" {
-				continue
-			}
-			s = skipSpace(s)
-			var v string
-			if strings.HasPrefix(s, "=") {
-				v, s = nextTokenOrQuoted(skipSpace(s[1:]))
+			ext := map[string]string{"": t}
+			for {
 				s = skipSpace(s)
+				if !strings.HasPrefix(s, ";") {
+					break
+				}
+				var k string
+				k, s = nextToken(skipSpace(s[1:]))
+				if k == "" {
+					continue headers
+				}
+				s = skipSpace(s)
+				var v string
+				if strings.HasPrefix(s, "=") {
+					v, s = nextTokenOrQuoted(skipSpace(s[1:]))
+					s = skipSpace(s)
+				}
+				if s != "" && s[0] != ',' && s[0] != ';' {
+					continue headers
+				}
+				ext[k] = v
 			}
-			if s != "" && s[0] != ',' && s[0] != ';' {
-				continue
+			if s != "" && s[0] != ',' {
+				continue headers
 			}
-			ext[k] = v
+			result = append(result, ext)
+			if s == "" {
+				continue headers
+			}
+			s = s[1:]
 		}
-		if s != "" && s[0] != ',' {
-			continue
-		}
-		result = append(result, ext)
-		if s == "" {
-			continue
-		}
-		s = s[1:]
 	}
 	return result
+}
+
+func computeAcceptKeyByte(challengeKey []byte) string {
+	h := sha1.New()
+	h.Write(challengeKey)
+	h.Write(keyGUID)
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
