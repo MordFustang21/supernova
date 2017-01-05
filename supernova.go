@@ -51,6 +51,10 @@ func (sn *SuperNova) Serve(addr string) error {
 	return fasthttp.ListenAndServe(addr, sn.handler)
 }
 
+func (sn *SuperNova) ServeTLS(addr, certFile, keyFile string) error {
+	return fasthttp.ListenAndServeTLS(addr, certFile, keyFile, sn.handler)
+}
+
 func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 	request := NewRequest(ctx)
 
