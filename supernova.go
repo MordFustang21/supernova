@@ -2,22 +2,19 @@ package supernova
 
 import (
 	"bytes"
-	"github.com/klauspost/compress/gzip"
-	"github.com/valyala/fasthttp"
 	"io/ioutil"
 	"mime"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/klauspost/compress/gzip"
+	"github.com/valyala/fasthttp"
 )
 
 type SuperNova struct {
-	paths              map[string]Route
-	getPaths           map[string]Route
-	postPaths          map[string]Route
-	putPaths           map[string]Route
-	deletePaths        map[string]Route
+	paths              map[string]map[string]Route
 	staticDirs         []string
 	middleWare         []MiddleWare
 	cachedStatic       *CachedStatic
@@ -70,36 +67,14 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 
 	var lookupPaths map[string]Route
 
+	if val, ok := sn.paths[string(request.Method())]; ok {
+		lookupPaths = val
+	} else {
+		lookupPaths = sn.paths[""]
+	}
+
 	for range pathParts {
-		switch string(request.Method()) {
-		case "GET":
-			lookupPaths = sn.getPaths
-			break
-		case "PUT":
-			lookupPaths = sn.putPaths
-			break
-		case "POST":
-			lookupPaths = sn.postPaths
-			break
-		case "DELETE":
-			lookupPaths = sn.deletePaths
-			break
-		}
-
 		route, ok := lookupPaths[path]
-		if ok {
-			route.rq = request
-
-			//Prepare data for call
-			route.prepare()
-
-			//Call user handler
-			route.call()
-			return
-		}
-
-		//TODO: Remove duplicate code
-		route, ok = sn.paths[path]
 		if ok {
 			route.rq = request
 
@@ -126,49 +101,40 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 }
 
 func (sn *SuperNova) All(route string, routeFunc func(*Request)) {
-
-	if sn.paths == nil {
-		sn.paths = make(map[string]Route, 0)
-	}
-
 	routeObj := buildRoute(route, routeFunc)
-	sn.paths[routeObj.route] = routeObj
+	sn.addRoute("", routeObj)
 }
 
 func (sn *SuperNova) Get(route string, routeFunc func(*Request)) {
-	if sn.getPaths == nil {
-		sn.getPaths = make(map[string]Route)
-	}
-
 	routeObj := buildRoute(route, routeFunc)
-	sn.getPaths[routeObj.route] = routeObj
+	sn.addRoute("GET", routeObj)
 }
 
 func (sn *SuperNova) Post(route string, routeFunc func(*Request)) {
-	if sn.postPaths == nil {
-		sn.postPaths = make(map[string]Route)
-	}
-
 	routeObj := buildRoute(route, routeFunc)
-	sn.postPaths[routeObj.route] = routeObj
+	sn.addRoute("POST", routeObj)
 }
 
 func (sn *SuperNova) Put(route string, routeFunc func(*Request)) {
-	if sn.putPaths == nil {
-		sn.putPaths = make(map[string]Route)
-	}
-
 	routeObj := buildRoute(route, routeFunc)
-	sn.putPaths[routeObj.route] = routeObj
+	sn.addRoute("PUT", routeObj)
 }
 
 func (sn *SuperNova) Delete(route string, routeFunc func(*Request)) {
-	if sn.deletePaths == nil {
-		sn.deletePaths = make(map[string]Route)
+	routeObj := buildRoute(route, routeFunc)
+	sn.addRoute("DELETE", routeObj)
+}
+
+func (sn *SuperNova) addRoute(method string, route Route) {
+	if sn.paths == nil {
+		sn.paths = make(map[string]map[string]Route)
 	}
 
-	routeObj := buildRoute(route, routeFunc)
-	sn.deletePaths[routeObj.route] = routeObj
+	if sn.paths[method] == nil {
+		sn.paths[method] = make(map[string]Route)
+	}
+
+	sn.paths[method][route.route] = route
 }
 
 func buildRoute(route string, routeFunc func(*Request)) Route {
@@ -178,6 +144,7 @@ func buildRoute(route string, routeFunc func(*Request)) Route {
 	routeObj.routeParamsIndex = make(map[int]string)
 
 	routeParts := strings.Split(route, "/")
+	routeObj.routePartsLen = len(routeParts)
 	baseDir := ""
 	for i := range routeParts {
 		if strings.Contains(routeParts[i], ":") {
@@ -254,21 +221,21 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 }
 
 //Adds a new function to the middleware stack
-func (s *SuperNova) Use(f func(*Request, func())) {
-	if s.middleWare == nil {
-		s.middleWare = make([]MiddleWare, 0)
+func (sn *SuperNova) Use(f func(*Request, func())) {
+	if sn.middleWare == nil {
+		sn.middleWare = make([]MiddleWare, 0)
 	}
 	middle := new(MiddleWare)
 	middle.middleFunc = f
-	s.middleWare = append(s.middleWare, *middle)
+	sn.middleWare = append(sn.middleWare, *middle)
 }
 
 //Internal method that runs the middleware
-func (s *SuperNova) runMiddleware(req *Request) bool {
+func (sn *SuperNova) runMiddleware(req *Request) bool {
 	stackFinished := true
-	for m := range s.middleWare {
+	for m := range sn.middleWare {
 		nextCalled := false
-		s.middleWare[m].middleFunc(req, func() {
+		sn.middleWare[m].middleFunc(req, func() {
 			nextCalled = true
 		})
 
