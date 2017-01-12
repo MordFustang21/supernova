@@ -65,16 +65,11 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 	pathParts := strings.Split(request.BaseUrl, "/")
 	path := strings.Join(pathParts, "/")
 
-	var lookupPaths map[string]Route
-
-	if val, ok := sn.paths[string(request.Method())]; ok {
-		lookupPaths = val
-	} else {
-		lookupPaths = sn.paths[""]
-	}
-
 	for range pathParts {
-		route, ok := lookupPaths[path]
+		route, ok := sn.paths[""][path]
+		if !ok {
+			route, ok = sn.paths[request.GetMethod()][path]
+		}
 		if ok {
 			route.rq = request
 

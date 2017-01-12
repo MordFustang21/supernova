@@ -3,10 +3,11 @@ package supernova
 import (
 	"encoding/json"
 	"errors"
-	"github.com/valyala/fasthttp"
-	"golang.org/x/net/context"
 	"log"
 	"strings"
+
+	"github.com/valyala/fasthttp"
+	"golang.org/x/net/context"
 )
 
 type Request struct {
