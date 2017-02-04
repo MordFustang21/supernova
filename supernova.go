@@ -9,17 +9,28 @@ import (
 	"sync"
 	"time"
 
+	"os/signal"
+	"syscall"
+
+	"net"
+
+	"fmt"
+
 	"github.com/klauspost/compress/gzip"
 	"github.com/valyala/fasthttp"
 )
 
 type SuperNova struct {
+	server             *fasthttp.Server
+	ln                 net.Listener
 	paths              map[string]map[string]Route
 	staticDirs         []string
 	middleWare         []MiddleWare
 	cachedStatic       *CachedStatic
 	maxCachedTime      int64
 	compressionEnabled bool
+
+	shutdownHandler func()
 }
 
 type CachedObj struct {
@@ -45,7 +56,17 @@ func Super() *SuperNova {
 }
 
 func (sn *SuperNova) Serve(addr string) error {
-	return fasthttp.ListenAndServe(addr, sn.handler)
+	sn.server = &fasthttp.Server{
+		Handler: sn.handler,
+	}
+	listener, err := net.Listen("tcp4", addr)
+	if err != nil {
+		return err
+	}
+
+	sn.ln = NewGracefulListener(listener, time.Second*5)
+
+	return sn.server.Serve(sn.ln)
 }
 
 func (sn *SuperNova) ServeTLS(addr, certFile, keyFile string) error {
@@ -241,4 +262,24 @@ func (sn *SuperNova) runMiddleware(req *Request) bool {
 	}
 
 	return stackFinished
+}
+
+func (sn *SuperNova) SetShutDownHandler(shutdownFunc func()) {
+	sigs := make(chan os.Signal)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	for {
+		select {
+		case <-sigs:
+			println("Gracefully finishing routes before exiting")
+			err := sn.ln.Close()
+			if err != nil {
+				fmt.Printf("Error closing conn: %s\n", err.Error())
+			}
+
+			if shutdownFunc != nil {
+				shutdownFunc()
+			}
+			os.Exit(0)
+		}
+	}
 }
