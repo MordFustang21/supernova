@@ -2,34 +2,36 @@ package supernova
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"mime"
+	"net"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
-	"time"
-
-	"os/signal"
 	"syscall"
-
-	"net"
-
-	"fmt"
+	"time"
 
 	"github.com/klauspost/compress/gzip"
 	"github.com/valyala/fasthttp"
 )
 
+// A SuperNova represents the router and all associated data
 type SuperNova struct {
-	server             *fasthttp.Server
-	ln                 net.Listener
-	paths              map[string]map[string]Route
+	server *fasthttp.Server
+	ln     net.Listener
+
+	// radix tree for looking up routes
+	paths map[string]interface{}
+
 	staticDirs         []string
 	middleWare         []MiddleWare
 	cachedStatic       *CachedStatic
 	maxCachedTime      int64
 	compressionEnabled bool
 
+	// shutdown function called when ctl-c is intercepted
 	shutdownHandler func()
 }
 
@@ -55,6 +57,7 @@ func Super() *SuperNova {
 	return s
 }
 
+// Serve starts the server
 func (sn *SuperNova) Serve(addr string) error {
 	sn.server = &fasthttp.Server{
 		Handler: sn.handler,
@@ -69,46 +72,31 @@ func (sn *SuperNova) Serve(addr string) error {
 	return sn.server.Serve(sn.ln)
 }
 
+// ServeTLS starts server with ssl
 func (sn *SuperNova) ServeTLS(addr, certFile, keyFile string) error {
 	return fasthttp.ListenAndServeTLS(addr, certFile, keyFile, sn.handler)
 }
 
+// handler is the main entry point into the router
 func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 	request := NewRequest(ctx)
 
 	//Run Middleware
 	finished := sn.runMiddleware(request)
-
 	if !finished {
 		return
 	}
 
-	pathParts := strings.Split(request.BaseUrl, "/")
-	path := strings.Join(pathParts, "/")
-
-	for range pathParts {
-		route, ok := sn.paths[""][path]
-		if !ok {
-			route, ok = sn.paths[request.GetMethod()][path]
-		}
-		if ok {
-			route.rq = request
-
-			//Prepare data for call
-			route.prepare()
-
-			//Call user handler
-			route.call()
-			return
-		}
-
-		_, pathParts = pathParts[len(pathParts)-1], pathParts[:len(pathParts)-1]
-		path = strings.Join(pathParts, "/")
+	route := sn.climbTree(request.GetMethod(), request.BaseUrl)
+	if route != nil {
+		route.rq = request
+		route.prepare()
+		route.call()
+		return
 	}
 
 	//Check for static file
 	served := sn.serveStatic(request)
-
 	if served {
 		return
 	}
@@ -116,66 +104,119 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 	ctx.Error("404 Not Found", fasthttp.StatusNotFound)
 }
 
+// All adds route for all http methods
 func (sn *SuperNova) All(route string, routeFunc func(*Request)) {
 	routeObj := buildRoute(route, routeFunc)
 	sn.addRoute("", routeObj)
 }
 
+// Get adds only GET method to route
 func (sn *SuperNova) Get(route string, routeFunc func(*Request)) {
 	routeObj := buildRoute(route, routeFunc)
 	sn.addRoute("GET", routeObj)
 }
 
+// Post adds only POST method to route
 func (sn *SuperNova) Post(route string, routeFunc func(*Request)) {
 	routeObj := buildRoute(route, routeFunc)
 	sn.addRoute("POST", routeObj)
 }
 
+// Put adds only PUT method to route
 func (sn *SuperNova) Put(route string, routeFunc func(*Request)) {
 	routeObj := buildRoute(route, routeFunc)
 	sn.addRoute("PUT", routeObj)
 }
 
+// Delete adds only DELETE method to route
 func (sn *SuperNova) Delete(route string, routeFunc func(*Request)) {
 	routeObj := buildRoute(route, routeFunc)
 	sn.addRoute("DELETE", routeObj)
 }
 
-func (sn *SuperNova) addRoute(method string, route Route) {
+// addRoute takes route and method and adds it to route tree
+func (sn *SuperNova) addRoute(method string, route *Route) {
 	if sn.paths == nil {
-		sn.paths = make(map[string]map[string]Route)
+		sn.paths = make(map[string]interface{})
 	}
 
 	if sn.paths[method] == nil {
-		sn.paths[method] = make(map[string]Route)
+		sn.paths[method] = make(map[string]interface{})
 	}
 
-	sn.paths[method][route.route] = route
+	parts := strings.Split(route.route[1:], "/")
+
+	var currentLeaf interface{}
+	currentLeaf = sn.paths[method]
+	for index, val := range parts {
+		leaf, ok := currentLeaf.(map[string]interface{})
+		if ok {
+			var isParam bool
+			if val[0] == ':' {
+				isParam = true
+				val = ""
+			}
+
+			if index != len(parts)-1 {
+				if isParam {
+					// Put in map with param
+					if leaf[val] == nil {
+						leaf[val] = make(map[string]interface{})
+					}
+					currentLeaf = leaf[val]
+				} else {
+					// put in map with val
+					if leaf[val] == nil {
+						leaf[val] = make(map[string]interface{})
+					}
+					currentLeaf = leaf[val]
+				}
+			} else {
+				leaf[val] = route
+			}
+		}
+	}
 }
 
-func buildRoute(route string, routeFunc func(*Request)) Route {
+// climbTree takes in path and traverses tree to find route
+func (sn *SuperNova) climbTree(method, path string) *Route {
+	parts := strings.Split(path[1:], "/")
+
+	currentLeaf := sn.paths[method]
+	for index, val := range parts {
+		leaf, ok := currentLeaf.(map[string]interface{})
+		if ok {
+			if _, ok := leaf[val]; !ok {
+				if _, ok := leaf[""]; ok {
+					currentLeaf = leaf[""]
+				}
+			} else {
+				currentLeaf = leaf[val]
+			}
+		}
+		if index == len(parts)-1 {
+			route, ok := currentLeaf.(*Route)
+			if ok {
+				return route
+			}
+		}
+	}
+	return nil
+}
+
+// buildRoute creates new Route
+func buildRoute(route string, routeFunc func(*Request)) *Route {
 	routeObj := new(Route)
 	routeObj.routeFunc = routeFunc
 
 	routeObj.routeParamsIndex = make(map[int]string)
 
-	routeParts := strings.Split(route, "/")
-	routeObj.routePartsLen = len(routeParts)
-	baseDir := ""
-	for i := range routeParts {
-		if strings.Contains(routeParts[i], ":") {
-			routeParamMod := strings.Replace(routeParts[i], ":", "", 1)
-			routeObj.routeParamsIndex[i] = routeParamMod
-		} else {
-			baseDir += routeParts[i] + "/"
-		}
-	}
+	routeObj.route = route
 
-	routeObj.route = strings.TrimSuffix(baseDir, "/")
-
-	return *routeObj
+	return routeObj
 }
 
+// AddStatic adds static route to be served
 func (sn *SuperNova) AddStatic(dir string) {
 	if sn.staticDirs == nil {
 		sn.staticDirs = make([]string, 0)
@@ -186,10 +227,12 @@ func (sn *SuperNova) AddStatic(dir string) {
 	}
 }
 
+// EnableGzip turns on Gzip compression for static
 func (sn *SuperNova) EnableGzip(value bool) {
 	sn.compressionEnabled = value
 }
 
+// serveStatic looks up folder and serves static files
 func (sn *SuperNova) serveStatic(req *Request) bool {
 	for i := range sn.staticDirs {
 		staticDir := sn.staticDirs[i]
@@ -206,7 +249,7 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 		if stat, err := os.Stat(path); err == nil {
 			//Set mime type
 			extensionParts := strings.Split(path, ".")
-			ext := extensionParts[len(extensionParts)-1]
+			ext := extensionParts[len(extensionParts) - 1]
 			mType := mime.TypeByExtension("." + ext)
 
 			if mType != "" {
