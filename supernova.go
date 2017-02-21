@@ -8,12 +8,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-
 	"os/signal"
 	"syscall"
-
 	"net"
-
 	"fmt"
 
 	"github.com/klauspost/compress/gzip"
@@ -23,7 +20,7 @@ import (
 type SuperNova struct {
 	server             *fasthttp.Server
 	ln                 net.Listener
-	paths              map[string]map[string]Route
+	paths              map[string]interface{}
 	staticDirs         []string
 	middleWare         []MiddleWare
 	cachedStatic       *CachedStatic
@@ -83,27 +80,12 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	pathParts := strings.Split(request.BaseUrl, "/")
-	path := strings.Join(pathParts, "/")
-
-	for range pathParts {
-		route, ok := sn.paths[""][path]
-		if !ok {
-			route, ok = sn.paths[request.GetMethod()][path]
-		}
-		if ok {
-			route.rq = request
-
-			//Prepare data for call
-			route.prepare()
-
-			//Call user handler
-			route.call()
-			return
-		}
-
-		_, pathParts = pathParts[len(pathParts)-1], pathParts[:len(pathParts)-1]
-		path = strings.Join(pathParts, "/")
+	route := sn.climbTree(request.GetMethod(), request.BaseUrl)
+	if route != nil {
+		route.rq = request
+		route.prepare()
+		route.call()
+		return
 	}
 
 	//Check for static file
@@ -143,14 +125,66 @@ func (sn *SuperNova) Delete(route string, routeFunc func(*Request)) {
 
 func (sn *SuperNova) addRoute(method string, route Route) {
 	if sn.paths == nil {
-		sn.paths = make(map[string]map[string]Route)
+		sn.paths = make(map[string]interface{})
 	}
 
 	if sn.paths[method] == nil {
-		sn.paths[method] = make(map[string]Route)
+		sn.paths[method] = make(map[string]interface{})
 	}
 
-	sn.paths[method][route.route] = route
+	parts := strings.Split(route.route, "/")
+
+	var currentLeaf interface{}
+	currentLeaf = sn.paths[method]
+	for index, val := range parts {
+		leaf, ok := currentLeaf.(map[string]interface{})
+		if !ok {
+			// throw error
+		}
+		if val != "" {
+			if []byte(val)[0] == ':' {
+				// Put in map with param
+				leaf["param"] = make(map[string]interface{})
+				currentLeaf = leaf["param"]
+			} else {
+				// put in map with val
+				leaf[val] = make(map[string]interface{})
+				currentLeaf = leaf[val]
+			}
+
+			if index+1 == len(parts) {
+				leaf[val] = route
+			}
+		}
+	}
+}
+
+// climbTree takes in path and traverses tree to find route
+func (sn *SuperNova) climbTree(method, path string) *Route {
+	parts := strings.Split(path, "/")
+
+	var currentLeaf interface{}
+	currentLeaf = sn.paths[method]
+	for index, val := range parts {
+		leaf, ok := currentLeaf.(map[string]interface{})
+		if ok {
+			if _, ok := leaf[val]; !ok {
+				if _, ok := leaf["param"]; ok {
+					currentLeaf = leaf["param"]
+				}
+			} else {
+				currentLeaf = leaf[val]
+			}
+		}
+
+		if index+1 == len(parts) {
+			route, ok := currentLeaf.(Route)
+			if ok {
+				return &route
+			}
+		}
+	}
+	return nil
 }
 
 func buildRoute(route string, routeFunc func(*Request)) Route {
@@ -161,17 +195,8 @@ func buildRoute(route string, routeFunc func(*Request)) Route {
 
 	routeParts := strings.Split(route, "/")
 	routeObj.routePartsLen = len(routeParts)
-	baseDir := ""
-	for i := range routeParts {
-		if strings.Contains(routeParts[i], ":") {
-			routeParamMod := strings.Replace(routeParts[i], ":", "", 1)
-			routeObj.routeParamsIndex[i] = routeParamMod
-		} else {
-			baseDir += routeParts[i] + "/"
-		}
-	}
 
-	routeObj.route = strings.TrimSuffix(baseDir, "/")
+	routeObj.route = route
 
 	return *routeObj
 }

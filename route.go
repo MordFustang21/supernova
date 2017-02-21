@@ -14,12 +14,15 @@ type Route struct {
 
 func (r *Route) buildRouteParams() {
 	routeParams := r.rq.RouteParams
-	pathParts := strings.Split(r.rq.BaseUrl, "/")
+	reqParts := strings.Split(r.rq.BaseUrl, "/")
+	routeParts := strings.Split(r.route, "/")
 
-	for i := range r.routeParamsIndex {
-		name := r.routeParamsIndex[i]
-		if i <= len(pathParts)-1 {
-			routeParams[name] = pathParts[i]
+	for index, val := range routeParts {
+		if len(val) > 0 {
+			bVal := []byte(val)
+			if bVal[0] == ':' {
+				routeParams[string(bVal[1:])] = reqParts[index]
+			}
 		}
 	}
 }
