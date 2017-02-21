@@ -9,7 +9,6 @@ type Route struct {
 	routeFunc        func(*Request)
 	routeParamsIndex map[int]string
 	route            string
-	routePartsLen    int
 }
 
 func (r *Route) buildRouteParams() {
