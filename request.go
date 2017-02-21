@@ -18,11 +18,23 @@ type Request struct {
 	Ctx         context.Context
 }
 
+func (r *Request) buildRouteParams(route string) {
+	routeParams := r.RouteParams
+	reqParts := strings.Split(r.BaseUrl, "/")
+	routeParts := strings.Split(route[1:], "/")
+
+	for index, val := range routeParts {
+		if val[0] == ':' {
+			routeParams[val[1:]] = reqParts[index]
+		}
+	}
+}
+
 func NewRequest(ctx *fasthttp.RequestCtx) *Request {
 	request := Request{ctx, make(map[string]string), make([]byte, 0), "", context.Background()}
 	request.Body = ctx.Request.Body()
-
-	request.buildUrlParams()
+	request.BaseUrl = string(request.URI().Path())
+	//request.buildUrlParams()
 
 	return &request
 }
@@ -65,9 +77,7 @@ func (r *Request) GetMethod() string {
 // Builds url params and returns base route
 func (r *Request) buildUrlParams() {
 	reqUrl := string(r.Request.RequestURI())
-
 	baseParts := strings.Split(reqUrl, "?")
-	r.BaseUrl = baseParts[0]
 
 	if len(baseParts) > 1 {
 		params := strings.Join(baseParts[1:], "")

@@ -23,7 +23,7 @@ type SuperNova struct {
 	ln     net.Listener
 
 	// radix tree for looking up routes
-	paths map[string]interface{}
+	paths map[string]*Node
 
 	staticDirs         []string
 	middleWare         []MiddleWare
@@ -33,6 +33,12 @@ type SuperNova struct {
 
 	// shutdown function called when ctl-c is intercepted
 	shutdownHandler func()
+}
+
+type Node struct {
+	route    *Route
+	isEdge   bool
+	children map[string]*Node
 }
 
 type CachedObj struct {
@@ -89,9 +95,7 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 
 	route := sn.climbTree(request.GetMethod(), request.BaseUrl)
 	if route != nil {
-		route.rq = request
-		route.prepare()
-		route.call()
+		route.call(request)
 		return
 	}
 
@@ -136,71 +140,75 @@ func (sn *SuperNova) Delete(route string, routeFunc func(*Request)) {
 
 // addRoute takes route and method and adds it to route tree
 func (sn *SuperNova) addRoute(method string, route *Route) {
+	routeStr := route.route
+	if routeStr[len(routeStr)-1] == '/' {
+		routeStr = routeStr[:len(routeStr)-1]
+		route.route = routeStr
+	}
 	if sn.paths == nil {
-		sn.paths = make(map[string]interface{})
+		sn.paths = make(map[string]*Node)
 	}
 
 	if sn.paths[method] == nil {
-		sn.paths[method] = make(map[string]interface{})
+		node := new(Node)
+		node.children = make(map[string]*Node)
+		sn.paths[method] = node
 	}
 
-	parts := strings.Split(route.route[1:], "/")
+	parts := strings.Split(routeStr[1:], "/")
 
-	var currentLeaf interface{}
-	currentLeaf = sn.paths[method]
+	currentNode := sn.paths[method]
 	for index, val := range parts {
-		leaf, ok := currentLeaf.(map[string]interface{})
-		if ok {
-			var isParam bool
-			if val[0] == ':' {
-				isParam = true
-				val = ""
-			}
+		if val[0] == ':' {
+			node := getNode(false, nil)
+			currentNode.children[""] = node
+			currentNode = node
+		} else {
+			node := getNode(false, nil)
+			currentNode.children[val] = node
+			currentNode = node
+		}
 
-			if index != len(parts)-1 {
-				if isParam {
-					// Put in map with param
-					if leaf[val] == nil {
-						leaf[val] = make(map[string]interface{})
-					}
-					currentLeaf = leaf[val]
-				} else {
-					// put in map with val
-					if leaf[val] == nil {
-						leaf[val] = make(map[string]interface{})
-					}
-					currentLeaf = leaf[val]
-				}
-			} else {
-				leaf[val] = route
-			}
+		if index == len(parts)-1 {
+			node := getNode(true, route)
+			currentNode.children[val] = node
+			currentNode = node
 		}
 	}
+}
+
+func getNode(isEdge bool, route *Route) *Node {
+	node := new(Node)
+	node.children = make(map[string]*Node)
+	if isEdge {
+		node.isEdge = true
+		node.route = route
+	}
+	return node
 }
 
 // climbTree takes in path and traverses tree to find route
 func (sn *SuperNova) climbTree(method, path string) *Route {
 	parts := strings.Split(path[1:], "/")
+	pathLen := len(parts) - 1
 
-	currentLeaf := sn.paths[method]
+	currentNode := sn.paths[method]
 	for index, val := range parts {
-		leaf, ok := currentLeaf.(map[string]interface{})
-		if ok {
-			if _, ok := leaf[val]; !ok {
-				if _, ok := leaf[""]; ok {
-					currentLeaf = leaf[""]
-				}
-			} else {
-				currentLeaf = leaf[val]
-			}
+		var node *Node
+		node = currentNode.children[val]
+		if node == nil {
+			node = currentNode.children[""]
 		}
-		if index == len(parts)-1 {
-			route, ok := currentLeaf.(*Route)
-			if ok {
-				return route
-			}
+
+		if node != nil {
+			currentNode = node
+		}
+
+		if index == pathLen {
+			return currentNode.children[val].route
 		}
 	}
+
 	return nil
 }
 
@@ -249,7 +257,7 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 		if stat, err := os.Stat(path); err == nil {
 			//Set mime type
 			extensionParts := strings.Split(path, ".")
-			ext := extensionParts[len(extensionParts) - 1]
+			ext := extensionParts[len(extensionParts)-1]
 			mType := mime.TypeByExtension("." + ext)
 
 			if mType != "" {
