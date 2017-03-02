@@ -39,7 +39,7 @@ func NewRequest(ctx *fasthttp.RequestCtx) *Request {
 	return &request
 }
 
-func (r *Request) Json(i interface{}) error {
+func (r *Request) JSON(i interface{}) error {
 	if r.Body == nil {
 		return errors.New("Request Body is empty")
 	}
@@ -58,10 +58,9 @@ func (r *Request) Send(data interface{}) {
 	}
 }
 
-func (r *Request) SendJson(obj interface{}) error {
+func (r *Request) SendJSON(obj interface{}) error {
 	jsn, err := json.Marshal(obj)
 	if err != nil {
-		log.Println(err)
 		return err
 	}
 

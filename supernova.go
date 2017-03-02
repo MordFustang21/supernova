@@ -26,7 +26,7 @@ type SuperNova struct {
 	paths map[string]*Node
 
 	staticDirs         []string
-	middleWare         []MiddleWare
+	middleWare         []Middleware
 	cachedStatic       *CachedStatic
 	maxCachedTime      int64
 	compressionEnabled bool
@@ -52,10 +52,11 @@ type CachedStatic struct {
 }
 
 //Middleware obj to hold functions
-type MiddleWare struct {
+type Middleware struct {
 	middleFunc func(*Request, func())
 }
 
+// Super returns new supernova router
 func Super() *SuperNova {
 	s := new(SuperNova)
 	s.cachedStatic = new(CachedStatic)
@@ -290,9 +291,9 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 //Adds a new function to the middleware stack
 func (sn *SuperNova) Use(f func(*Request, func())) {
 	if sn.middleWare == nil {
-		sn.middleWare = make([]MiddleWare, 0)
+		sn.middleWare = make([]Middleware, 0)
 	}
-	middle := new(MiddleWare)
+	middle := new(Middleware)
 	middle.middleFunc = f
 	sn.middleWare = append(sn.middleWare, *middle)
 }
@@ -321,7 +322,6 @@ func (sn *SuperNova) SetShutDownHandler(shutdownFunc func()) {
 	for {
 		select {
 		case <-sigs:
-			println("Gracefully finishing routes before exiting")
 			err := sn.ln.Close()
 			if err != nil {
 				fmt.Printf("Error closing conn: %s\n", err.Error())

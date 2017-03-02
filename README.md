@@ -37,7 +37,7 @@ func main() {
 		}
 
 		testS := test{}
-		err := req.Json(&testS)
+		err := req.JSON(&testS)
 		if err != nil {
 			log.Println(err)
 		}
@@ -45,19 +45,8 @@ func main() {
 	});
 
 	s.Get("/test/:taco/:apple", func(req *supernova.Request) {
-		req.Json(req.RouteParams)
+		req.SendJSON(req.RouteParams)
 	});
-
-	// Websocket example
-	s.All("/ws", func(req *supernova.Request) {
-        err := upgrader.Upgrade(req, func(conn *supernova.Conn) {
-            conn.WriteMessage(supernova.TextMessage, []byte("Web socket success"))
-        })
-
-        if err != nil {
-            println("Error upgrading connection")
-        }
-    })
 
 	err := s.Serve(":8080")
 
@@ -66,5 +55,3 @@ func main() {
 	}
 }
 ```
-# Todo:
-Add graceful stopping
