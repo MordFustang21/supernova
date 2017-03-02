@@ -79,16 +79,18 @@ func (r *Request) buildUrlParams() {
 	reqUrl := string(r.Request.RequestURI())
 	baseParts := strings.Split(reqUrl, "?")
 
-	if len(baseParts) > 1 {
-		params := strings.Join(baseParts[1:], "")
+	if len(baseParts) == 0 {
+		return
+	}
+	
+	params := strings.Join(baseParts[1:], "")
 
-		paramParts := strings.Split(params, "&")
+	paramParts := strings.Split(params, "&")
 
-		for i := range paramParts {
-			keyValue := strings.Split(paramParts[i], "=")
-			if len(keyValue) > 1 {
-				r.RouteParams[keyValue[0]] = keyValue[1]
-			}
+	for i := range paramParts {
+		keyValue := strings.Split(paramParts[i], "=")
+		if len(keyValue) > 1 {
+			r.RouteParams[keyValue[0]] = keyValue[1]
 		}
 	}
 }
