@@ -3,13 +3,13 @@ package supernova
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"strings"
 
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
 )
 
+// Request resembles an incoming request
 type Request struct {
 	*fasthttp.RequestCtx
 	RouteParams map[string]string
@@ -18,6 +18,7 @@ type Request struct {
 	Ctx         context.Context
 }
 
+// buildRouteParams builds a map of the route params
 func (r *Request) buildRouteParams(route string) {
 	routeParams := r.RouteParams
 	reqParts := strings.Split(r.BaseUrl, "/")
@@ -30,50 +31,52 @@ func (r *Request) buildRouteParams(route string) {
 	}
 }
 
+// NewRequest creates a new Request pointer for an incoming request
 func NewRequest(ctx *fasthttp.RequestCtx) *Request {
 	request := Request{ctx, make(map[string]string), make([]byte, 0), "", context.Background()}
 	request.Body = ctx.Request.Body()
 	request.BaseUrl = string(request.URI().Path())
-	//request.buildUrlParams()
 
 	return &request
 }
 
+// JSON unmarshals request body into the struct provided
 func (r *Request) JSON(i interface{}) error {
 	if r.Body == nil {
 		return errors.New("Request Body is empty")
 	}
-	
+
 	return json.Unmarshal(r.Body, i)
 }
 
-func (r *Request) Send(data interface{}) {
+// Send writes the data to the response body
+func (r *Request) Send(data interface{}) (int, error) {
 	switch v := data.(type) {
 	case []byte:
-		r.Write(v)
-		break
+		return r.Write(v)
 	case string:
-		r.Write([]byte(v))
-		break
+		return r.Write([]byte(v))
 	}
+	return 0, errors.New("unsupported type")
 }
 
-func (r *Request) SendJSON(obj interface{}) error {
+// SendJSON converts any data type to JSON and attaches to the response body
+func (r *Request) SendJSON(obj interface{}) (int, error) {
 	jsn, err := json.Marshal(obj)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	r.Response.Header.Set("Content-Type", "application/json")
-	r.Write(jsn)
-	return nil
+	return r.Write(jsn)
 }
 
+// GetMethod provides a simple way to return the request method type as a string
 func (r *Request) GetMethod() string {
 	return string(r.Method())
 }
 
-// Builds url params and returns base route
+// buildUrlParams builds url params and returns base route
 func (r *Request) buildUrlParams() {
 	reqUrl := string(r.Request.RequestURI())
 	baseParts := strings.Split(reqUrl, "?")
@@ -81,7 +84,7 @@ func (r *Request) buildUrlParams() {
 	if len(baseParts) == 0 {
 		return
 	}
-	
+
 	params := strings.Join(baseParts[1:], "")
 
 	paramParts := strings.Split(params, "&")
