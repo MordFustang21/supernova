@@ -1,3 +1,4 @@
+// Package supernova is a fasthttp router that implements a radix tree for fast lookups
 package supernova
 
 import (
@@ -17,7 +18,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-// A SuperNova represents the router and all associated data
+// SuperNova represents the router and all associated data
 type SuperNova struct {
 	server *fasthttp.Server
 	ln     net.Listener
@@ -35,23 +36,26 @@ type SuperNova struct {
 	shutdownHandler func()
 }
 
+// Node holds a single route with accompanying children routes
 type Node struct {
 	route    *Route
 	isEdge   bool
 	children map[string]*Node
 }
 
+// CachedObj represents a static asset
 type CachedObj struct {
 	data       []byte
 	timeCached time.Time
 }
 
+// CachedStatic holds all cached static assets in memory
 type CachedStatic struct {
 	mutex sync.Mutex
 	files map[string]*CachedObj
 }
 
-//Middleware obj to hold functions
+// Middleware holds all middleware functions
 type Middleware struct {
 	middleFunc func(*Request, func())
 }
@@ -88,7 +92,7 @@ func (sn *SuperNova) ServeTLS(addr, certFile, keyFile string) error {
 func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 	request := NewRequest(ctx)
 
-	//Run Middleware
+	// Run Middleware
 	finished := sn.runMiddleware(request)
 	if !finished {
 		return
@@ -100,7 +104,7 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	//Check for static file
+	// Check for static file
 	served := sn.serveStatic(request)
 	if served {
 		return
@@ -178,6 +182,7 @@ func (sn *SuperNova) addRoute(method string, route *Route) {
 	}
 }
 
+// getNode builds a new node to be added to the radix tree
 func getNode(isEdge bool, route *Route) *Node {
 	node := new(Node)
 	node.children = make(map[string]*Node)
@@ -217,9 +222,7 @@ func (sn *SuperNova) climbTree(method, path string) *Route {
 func buildRoute(route string, routeFunc func(*Request)) *Route {
 	routeObj := new(Route)
 	routeObj.routeFunc = routeFunc
-
 	routeObj.routeParamsIndex = make(map[int]string)
-
 	routeObj.route = route
 
 	return routeObj
@@ -247,48 +250,51 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 		staticDir := sn.staticDirs[i]
 		path := staticDir + string(req.Request.RequestURI())
 
-		//Remove all .. for security TODO: Allow if doesn't go above basedir
+		// Remove all .. for security TODO: Allow if doesn't go above basedir
 		path = strings.Replace(path, "..", "", -1)
 
-		//If ends in / default to index.html
+		// If ends in / default to index.html
 		if strings.HasSuffix(path, "/") {
 			path += "index.html"
 		}
 
-		if stat, err := os.Stat(path); err == nil {
-			//Set mime type
-			extensionParts := strings.Split(path, ".")
-			ext := extensionParts[len(extensionParts)-1]
-			mType := mime.TypeByExtension("." + ext)
-
-			if mType != "" {
-				req.Response.Header.Set("Content-Type", mType)
-			}
-
-			if sn.compressionEnabled && stat.Size() < 10000000 {
-				var b bytes.Buffer
-				writer := gzip.NewWriter(&b)
-
-				data, err := ioutil.ReadFile(path)
-				if err != nil {
-					println("Unable to read: " + err.Error())
-				}
-
-				writer.Write(data)
-				writer.Close()
-				req.Response.Header.Set("Content-Encoding", "gzip")
-				req.Send(b.String())
-			} else {
-				req.Response.SendFile(path)
-			}
-
-			return true
+		stat, err := os.Stat(path)
+		if err != nil {
+			continue
 		}
+
+		// Set mime type
+		extensionParts := strings.Split(path, ".")
+		ext := extensionParts[len(extensionParts)-1]
+		mType := mime.TypeByExtension("." + ext)
+
+		if mType != "" {
+			req.Response.Header.Set("Content-Type", mType)
+		}
+
+		if sn.compressionEnabled && stat.Size() < 10000000 {
+			var b bytes.Buffer
+			writer := gzip.NewWriter(&b)
+
+			data, err := ioutil.ReadFile(path)
+			if err != nil {
+				println("Unable to read: " + err.Error())
+			}
+
+			writer.Write(data)
+			writer.Close()
+			req.Response.Header.Set("Content-Encoding", "gzip")
+			req.Send(b.String())
+		} else {
+			req.Response.SendFile(path)
+		}
+
+		return true
 	}
 	return false
 }
 
-//Adds a new function to the middleware stack
+// Adds a new function to the middleware stack
 func (sn *SuperNova) Use(f func(*Request, func())) {
 	if sn.middleWare == nil {
 		sn.middleWare = make([]Middleware, 0)
@@ -298,7 +304,7 @@ func (sn *SuperNova) Use(f func(*Request, func())) {
 	sn.middleWare = append(sn.middleWare, *middle)
 }
 
-//Internal method that runs the middleware
+// Internal method that runs the middleware
 func (sn *SuperNova) runMiddleware(req *Request) bool {
 	stackFinished := true
 	for m := range sn.middleWare {
@@ -316,6 +322,7 @@ func (sn *SuperNova) runMiddleware(req *Request) bool {
 	return stackFinished
 }
 
+// SetShutDownHandler implements function called when SIGTERM signal is received
 func (sn *SuperNova) SetShutDownHandler(shutdownFunc func()) {
 	sigs := make(chan os.Signal)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
