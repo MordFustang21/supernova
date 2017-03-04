@@ -198,7 +198,13 @@ func (sn *SuperNova) climbTree(method, path string) *Route {
 	parts := strings.Split(path[1:], "/")
 	pathLen := len(parts) - 1
 
-	currentNode := sn.paths[method]
+	currentNode, ok := sn.paths[method]
+	if !ok {
+		currentNode, ok = sn.paths[""]
+		if !ok {
+			return nil
+		}
+	}
 	for index, val := range parts {
 		var node *Node
 		node = currentNode.children[val]
