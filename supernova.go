@@ -34,6 +34,9 @@ type SuperNova struct {
 
 	// shutdown function called when ctl-c is intercepted
 	shutdownHandler func()
+
+	// debug defines logging for requests
+	debug bool
 }
 
 // Node holds a single route with accompanying children routes
@@ -68,6 +71,12 @@ func Super() *SuperNova {
 	return s
 }
 
+func (sn *SuperNova) EnableDebug(debug bool) {
+	if debug {
+		sn.debug = true
+	}
+}
+
 // Serve starts the server
 func (sn *SuperNova) Serve(addr string) error {
 	sn.server = &fasthttp.Server{
@@ -91,6 +100,14 @@ func (sn *SuperNova) ServeTLS(addr, certFile, keyFile string) error {
 // handler is the main entry point into the router
 func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 	request := NewRequest(ctx)
+	var logMethod func()
+	if sn.debug {
+		logMethod = getDebugMethod(request)
+	}
+
+	if logMethod != nil {
+		defer logMethod()
+	}
 
 	// Run Middleware
 	finished := sn.runMiddleware(request)
@@ -217,7 +234,9 @@ func (sn *SuperNova) climbTree(method, path string) *Route {
 		}
 
 		if index == pathLen {
-			return currentNode.children[val].route
+			if node, ok := currentNode.children[val]; ok {
+				return node.route
+			}
 		}
 	}
 
