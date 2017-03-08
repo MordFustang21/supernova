@@ -77,8 +77,8 @@ func (sn *SuperNova) EnableDebug(debug bool) {
 	}
 }
 
-// Serve starts the server
-func (sn *SuperNova) Serve(addr string) error {
+// ListenAndServe starts the server
+func (sn *SuperNova) ListenAndServe(addr string) error {
 	sn.server = &fasthttp.Server{
 		Handler: sn.handler,
 	}
