@@ -181,19 +181,21 @@ func (sn *SuperNova) addRoute(method string, route *Route) {
 
 	currentNode := sn.paths[method]
 	for index, val := range parts {
+		childKey := val
 		if val[0] == ':' {
-			node := getNode(false, nil)
-			currentNode.children[""] = node
-			currentNode = node
+			childKey = ""
 		} else {
-			node := getNode(false, nil)
-			currentNode.children[val] = node
-			currentNode = node
+			childKey = val
 		}
+
+		// TODO: lookup existing nodes before creating new
+		node := getNode(false, nil)
+		currentNode.children[childKey] = node
+		currentNode = node
 
 		if index == len(parts)-1 {
 			node := getNode(true, route)
-			currentNode.children[val] = node
+			currentNode.children[childKey] = node
 			currentNode = node
 		}
 	}
@@ -230,6 +232,7 @@ func (sn *SuperNova) climbTree(method, path string) *Route {
 		}
 
 		if node != nil {
+			fmt.Println(node.children)
 			currentNode = node
 		}
 

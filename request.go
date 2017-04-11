@@ -3,6 +3,7 @@ package supernova
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 
 	"github.com/valyala/fasthttp"
@@ -15,6 +16,7 @@ type Request struct {
 	RouteParams map[string]string
 	Body        []byte
 	BaseUrl     string
+	writer      io.Writer
 	Ctx         context.Context
 }
 
@@ -33,11 +35,13 @@ func (r *Request) buildRouteParams(route string) {
 
 // NewRequest creates a new Request pointer for an incoming request
 func NewRequest(ctx *fasthttp.RequestCtx) *Request {
-	request := Request{ctx, make(map[string]string), make([]byte, 0), "", context.Background()}
-	request.Body = ctx.Request.Body()
-	request.BaseUrl = string(request.URI().Path())
+	req := new(Request)
+	req.RequestCtx = ctx
+	req.RouteParams = make(map[string]string)
+	req.Body = ctx.Request.Body()
+	req.BaseUrl = string(ctx.URI().Path())
 
-	return &request
+	return req
 }
 
 // JSON unmarshals request body into the struct provided
