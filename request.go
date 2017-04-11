@@ -29,7 +29,6 @@ func (r *Request) buildRouteParams(route string) {
 
 	for index, val := range routeParts {
 		if val[0] == ':' {
-			println(val[1:] + reqParts[index])
 			routeParams[val[1:]] = reqParts[index]
 		}
 	}
@@ -46,7 +45,7 @@ func NewRequest(ctx *fasthttp.RequestCtx) *Request {
 	return req
 }
 
-// JSON unmarshals request body into the struct provided
+// ReadJSON unmarshals request body into the struct provided
 func (r *Request) ReadJSON(i interface{}) error {
 	//TODO: detect body size and use reader if necessary
 	return json.Unmarshal(r.Request.Body(), i)
@@ -92,7 +91,6 @@ func (r *Request) buildUrlParams() {
 	}
 
 	params := strings.Join(baseParts[1:], "")
-
 	paramParts := strings.Split(params, "&")
 
 	for i := range paramParts {

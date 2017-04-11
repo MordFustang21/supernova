@@ -63,7 +63,7 @@ type Middleware struct {
 	middleFunc func(*Request, func())
 }
 
-// Super returns new supernova router
+// New returns new supernova router
 func New() *Server {
 	s := new(Server)
 	s.cachedStatic = new(CachedStatic)
@@ -71,6 +71,7 @@ func New() *Server {
 	return s
 }
 
+// EnableDebug toggles output for incoming requests
 func (sn *Server) EnableDebug(debug bool) {
 	if debug {
 		sn.debug = true
@@ -339,7 +340,7 @@ func (sn *Server) serveStatic(req *Request) bool {
 	return false
 }
 
-// Adds a new function to the middleware stack
+// Use adds a new function to the middleware stack
 func (sn *Server) Use(f func(*Request, func())) {
 	if sn.middleWare == nil {
 		sn.middleWare = make([]Middleware, 0)
