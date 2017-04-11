@@ -14,20 +14,22 @@ import (
 type Request struct {
 	*fasthttp.RequestCtx
 	RouteParams map[string]string
-	Body        []byte
 	BaseUrl     string
-	writer      io.Writer
-	Ctx         context.Context
+
+	// Writer is used to write to response body
+	Writer io.Writer
+	Ctx    context.Context
 }
 
 // buildRouteParams builds a map of the route params
 func (r *Request) buildRouteParams(route string) {
 	routeParams := r.RouteParams
-	reqParts := strings.Split(r.BaseUrl, "/")
+	reqParts := strings.Split(r.BaseUrl[1:], "/")
 	routeParts := strings.Split(route[1:], "/")
 
 	for index, val := range routeParts {
 		if val[0] == ':' {
+			println(val[1:] + reqParts[index])
 			routeParams[val[1:]] = reqParts[index]
 		}
 	}
@@ -38,19 +40,16 @@ func NewRequest(ctx *fasthttp.RequestCtx) *Request {
 	req := new(Request)
 	req.RequestCtx = ctx
 	req.RouteParams = make(map[string]string)
-	req.Body = ctx.Request.Body()
 	req.BaseUrl = string(ctx.URI().Path())
+	req.Writer = ctx.Response.BodyWriter()
 
 	return req
 }
 
 // JSON unmarshals request body into the struct provided
-func (r *Request) JSON(i interface{}) error {
-	if r.Body == nil {
-		return errors.New("Request Body is empty")
-	}
-
-	return json.Unmarshal(r.Body, i)
+func (r *Request) ReadJSON(i interface{}) error {
+	//TODO: detect body size and use reader if necessary
+	return json.Unmarshal(r.Request.Body(), i)
 }
 
 // Send writes the data to the response body
@@ -60,12 +59,15 @@ func (r *Request) Send(data interface{}) (int, error) {
 		return r.Write(v)
 	case string:
 		return r.Write([]byte(v))
+	case error:
+		return r.Write([]byte(v.Error()))
 	}
+
 	return 0, errors.New("unsupported type")
 }
 
-// SendJSON converts any data type to JSON and attaches to the response body
-func (r *Request) SendJSON(obj interface{}) (int, error) {
+// JSON marshals the given interface object and writes the JSON response.
+func (r *Request) JSON(obj interface{}) (int, error) {
 	jsn, err := json.Marshal(obj)
 	if err != nil {
 		return 0, err

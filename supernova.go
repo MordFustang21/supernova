@@ -188,10 +188,13 @@ func (sn *SuperNova) addRoute(method string, route *Route) {
 			childKey = val
 		}
 
-		// TODO: lookup existing nodes before creating new
-		node := getNode(false, nil)
-		currentNode.children[childKey] = node
-		currentNode = node
+		if node, ok := currentNode.children[childKey]; ok {
+			currentNode = node
+		} else {
+			node := getNode(false, nil)
+			currentNode.children[childKey] = node
+			currentNode = node
+		}
 
 		if index == len(parts)-1 {
 			node := getNode(true, route)
@@ -226,20 +229,29 @@ func (sn *SuperNova) climbTree(method, path string) *Route {
 	}
 	for index, val := range parts {
 		var node *Node
+
 		node = currentNode.children[val]
 		if node == nil {
 			node = currentNode.children[""]
 		}
 
-		if node != nil {
-			fmt.Println(node.children)
-			currentNode = node
+		// path not found return
+		if node == nil {
+			return nil
 		}
 
+		currentNode = node
+
+		// if at end return current route
 		if index == pathLen {
 			if node, ok := currentNode.children[val]; ok {
 				return node.route
 			}
+
+			if node, ok = currentNode.children[""]; ok {
+				return node.route
+			}
+
 		}
 	}
 
