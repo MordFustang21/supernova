@@ -97,6 +97,11 @@ func (sn *Server) ServeTLS(addr, certFile, keyFile string) error {
 	return fasthttp.ListenAndServeTLS(addr, certFile, keyFile, sn.handler)
 }
 
+// Close closes existing listener
+func (sn *Server) Close() error {
+	return sn.ln.Close()
+}
+
 // handler is the main entry point into the router
 func (sn *Server) handler(ctx *fasthttp.RequestCtx) {
 	request := NewRequest(ctx)
