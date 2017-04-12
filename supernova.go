@@ -94,7 +94,16 @@ func (sn *Server) ListenAndServe(addr string) error {
 }
 
 // ServeTLS starts server with ssl
-func (sn *Server) ServeTLS(addr, certFile, keyFile string) error {
+func (sn *Server) ListenAndServeTLS(addr, certFile, keyFile string) error {
+	sn.server = &fasthttp.Server{
+		Handler: sn.handler,
+	}
+	listener, err := net.Listen("tcp4", addr)
+	if err != nil {
+		return err
+	}
+
+	sn.ln = NewGracefulListener(listener, time.Second*5)
 	return fasthttp.ListenAndServeTLS(addr, certFile, keyFile, sn.handler)
 }
 
@@ -138,32 +147,32 @@ func (sn *Server) handler(ctx *fasthttp.RequestCtx) {
 
 // All adds route for all http methods
 func (sn *Server) All(route string, routeFunc func(*Request)) {
-	routeObj := buildRoute(route, routeFunc)
-	sn.addRoute("", routeObj)
+	sn.addRoute("", buildRoute(route, routeFunc))
 }
 
 // Get adds only GET method to route
 func (sn *Server) Get(route string, routeFunc func(*Request)) {
-	routeObj := buildRoute(route, routeFunc)
-	sn.addRoute("GET", routeObj)
+	sn.addRoute("GET", buildRoute(route, routeFunc))
 }
 
 // Post adds only POST method to route
 func (sn *Server) Post(route string, routeFunc func(*Request)) {
-	routeObj := buildRoute(route, routeFunc)
-	sn.addRoute("POST", routeObj)
+	sn.addRoute("POST", buildRoute(route, routeFunc))
 }
 
 // Put adds only PUT method to route
 func (sn *Server) Put(route string, routeFunc func(*Request)) {
-	routeObj := buildRoute(route, routeFunc)
-	sn.addRoute("PUT", routeObj)
+	sn.addRoute("PUT", buildRoute(route, routeFunc))
 }
 
 // Delete adds only DELETE method to route
 func (sn *Server) Delete(route string, routeFunc func(*Request)) {
-	routeObj := buildRoute(route, routeFunc)
-	sn.addRoute("DELETE", routeObj)
+	sn.addRoute("DELETE", buildRoute(route, routeFunc))
+}
+
+// Restricted adds route that is restricted by method
+func (sn *Server) Restricted(method, route string, routeFunc func(*Request)) {
+	sn.addRoute(method, buildRoute(route, routeFunc))
 }
 
 // addRoute takes route and method and adds it to route tree

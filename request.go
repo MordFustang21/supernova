@@ -13,7 +13,7 @@ import (
 // Request resembles an incoming request
 type Request struct {
 	*fasthttp.RequestCtx
-	RouteParams map[string]string
+	routeParams map[string]string
 	BaseUrl     string
 
 	// Writer is used to write to response body
@@ -21,9 +21,29 @@ type Request struct {
 	Ctx    context.Context
 }
 
-// buildRouteParams builds a map of the route params
+// NewRequest creates a new Request pointer for an incoming request
+func NewRequest(ctx *fasthttp.RequestCtx) *Request {
+	req := new(Request)
+	req.RequestCtx = ctx
+	req.routeParams = make(map[string]string)
+	req.BaseUrl = string(ctx.URI().Path())
+	req.Writer = ctx.Response.BodyWriter()
+
+	return req
+}
+
+// Param checks for and returns param or "" if doesn't exist
+func (r *Request) Param(key string) string {
+	if val, ok := r.routeParams["string"]; ok {
+		return val
+	}
+
+	return ""
+}
+
+// buildrouteParams builds a map of the route params
 func (r *Request) buildRouteParams(route string) {
-	routeParams := r.RouteParams
+	routeParams := r.routeParams
 	reqParts := strings.Split(r.BaseUrl[1:], "/")
 	routeParts := strings.Split(route[1:], "/")
 
@@ -32,17 +52,6 @@ func (r *Request) buildRouteParams(route string) {
 			routeParams[val[1:]] = reqParts[index]
 		}
 	}
-}
-
-// NewRequest creates a new Request pointer for an incoming request
-func NewRequest(ctx *fasthttp.RequestCtx) *Request {
-	req := new(Request)
-	req.RequestCtx = ctx
-	req.RouteParams = make(map[string]string)
-	req.BaseUrl = string(ctx.URI().Path())
-	req.Writer = ctx.Response.BodyWriter()
-
-	return req
 }
 
 // ReadJSON unmarshals request body into the struct provided
@@ -66,13 +75,14 @@ func (r *Request) Send(data interface{}) (int, error) {
 }
 
 // JSON marshals the given interface object and writes the JSON response.
-func (r *Request) JSON(obj interface{}) (int, error) {
+func (r *Request) JSON(code int, obj interface{}) (int, error) {
 	jsn, err := json.Marshal(obj)
 	if err != nil {
 		return 0, err
 	}
 
 	r.Response.Header.Set("Content-Type", "application/json")
+	r.SetStatusCode(code)
 	return r.Write(jsn)
 }
 
@@ -96,7 +106,7 @@ func (r *Request) buildUrlParams() {
 	for i := range paramParts {
 		keyValue := strings.Split(paramParts[i], "=")
 		if len(keyValue) > 1 {
-			r.RouteParams[keyValue[0]] = keyValue[1]
+			r.routeParams[keyValue[0]] = keyValue[1]
 		}
 	}
 }

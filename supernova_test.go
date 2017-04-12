@@ -71,6 +71,17 @@ func TestServer_Use(t *testing.T) {
 	}
 }
 
+func TestServer_Restricted(t *testing.T) {
+	s := New()
+	s.Restricted("OPTION", "/test", func(*Request) {
+
+	})
+
+	if s.paths["OPTION"].children["test"] == nil {
+		t.Error("Route wasn't restricted to method")
+	}
+}
+
 func TestMultipleChildren(t *testing.T) {
 	s := New()
 	s.All("/test/stuff", func(*Request) {
