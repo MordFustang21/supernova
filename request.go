@@ -21,6 +21,13 @@ type Request struct {
 	Ctx    context.Context
 }
 
+// JSONError resembles the RESTful standard for an error response
+type JSONError struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Desc string `json:"description"`
+}
+
 // NewRequest creates a new Request pointer for an incoming request
 func NewRequest(ctx *fasthttp.RequestCtx) *Request {
 	req := new(Request)
@@ -39,6 +46,17 @@ func (r *Request) Param(key string) string {
 	}
 
 	return ""
+}
+
+// Error allows an easy method to set the RESTful standard error response
+func (r *Request) Error(statusCode int, msg, desc string) (int, error) {
+	r.Response.Reset()
+	newErr := JSONError{
+		Code: statusCode,
+		Msg:  msg,
+		Desc: desc,
+	}
+	return r.JSON(statusCode, newErr)
 }
 
 // buildrouteParams builds a map of the route params
