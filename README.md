@@ -12,15 +12,16 @@ Example
 package main
 
 import (
-	"log"
 	"github.com/MordFustang21/supernova"
 )
 
 func main() {
-	s := supernova.Super()
+	// Get new instance of server
+	s := supernova.New()
 
 	//Static folder example
 	s.AddStatic("/sitedir/")
+
 	//If you want to cache a file (seconds)
 	s.SetCacheTimeout(5)
 
@@ -31,27 +32,42 @@ func main() {
 	})
 
 	//Route Examples
-	s.Get("/test/taco/:apple", func(req *supernova.Request) {
+	s.Post("/test/taco/:apple", func(req *supernova.Request) {
 		type test struct {
 			Apple string
 		}
 
-		testS := test{}
-		err := req.JSON(&testS)
+		// Read JSON into struct from body
+		var testS testS
+		err := req.ReadJSON(&testS)
 		if err != nil {
 			log.Println(err)
 		}
 		req.Send("Received data")
 	});
 
+	// Example Get route with route params
 	s.Get("/test/:taco/:apple", func(req *supernova.Request) {
-		req.SendJSON(req.RouteParams)
+		tacoType := req.Param("taco")
+		req.Send(tacoType)
 	});
 
-	err := s.Serve(":8080")
+	// Resticted routes are used to restict methods other than GET,PUT,POST,DELETE
+	s.Restricted("OPTIONS", "/test/stuff", func(req *supernova.Request) {
+		req.Send("OPTIONS Request received")
+	})
 
+	// Example post returning error
+	s.Post("/register", func(req *supernova.Request) {
+		if len(req.Request.Body()) == 0 {
+			// response code, error message, and any struct you want put into the errors array
+			req.Error(500, "Body is empty", interface{})
+		}
+	})
+
+	err := s.ListenAndServe(":8080")
 	if err != nil {
-		log.Fatal(err)
+		println(err.Error())
 	}
 }
 ```
