@@ -3,6 +3,7 @@ package supernova
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 
 	"github.com/valyala/fasthttp"
@@ -12,16 +13,38 @@ import (
 // Request resembles an incoming request
 type Request struct {
 	*fasthttp.RequestCtx
-	RouteParams map[string]string
-	Body        []byte
+	routeParams map[string]string
 	BaseUrl     string
-	Ctx         context.Context
+
+	// Writer is used to write to response body
+	Writer io.Writer
+	Ctx    context.Context
 }
 
-// buildRouteParams builds a map of the route params
+// NewRequest creates a new Request pointer for an incoming request
+func NewRequest(ctx *fasthttp.RequestCtx) *Request {
+	req := new(Request)
+	req.RequestCtx = ctx
+	req.routeParams = make(map[string]string)
+	req.BaseUrl = string(ctx.URI().Path())
+	req.Writer = ctx.Response.BodyWriter()
+
+	return req
+}
+
+// Param checks for and returns param or "" if doesn't exist
+func (r *Request) Param(key string) string {
+	if val, ok := r.routeParams["string"]; ok {
+		return val
+	}
+
+	return ""
+}
+
+// buildrouteParams builds a map of the route params
 func (r *Request) buildRouteParams(route string) {
-	routeParams := r.RouteParams
-	reqParts := strings.Split(r.BaseUrl, "/")
+	routeParams := r.routeParams
+	reqParts := strings.Split(r.BaseUrl[1:], "/")
 	routeParts := strings.Split(route[1:], "/")
 
 	for index, val := range routeParts {
@@ -31,22 +54,10 @@ func (r *Request) buildRouteParams(route string) {
 	}
 }
 
-// NewRequest creates a new Request pointer for an incoming request
-func NewRequest(ctx *fasthttp.RequestCtx) *Request {
-	request := Request{ctx, make(map[string]string), make([]byte, 0), "", context.Background()}
-	request.Body = ctx.Request.Body()
-	request.BaseUrl = string(request.URI().Path())
-
-	return &request
-}
-
-// JSON unmarshals request body into the struct provided
-func (r *Request) JSON(i interface{}) error {
-	if r.Body == nil {
-		return errors.New("Request Body is empty")
-	}
-
-	return json.Unmarshal(r.Body, i)
+// ReadJSON unmarshals request body into the struct provided
+func (r *Request) ReadJSON(i interface{}) error {
+	//TODO: detect body size and use reader if necessary
+	return json.Unmarshal(r.Request.Body(), i)
 }
 
 // Send writes the data to the response body
@@ -56,18 +67,22 @@ func (r *Request) Send(data interface{}) (int, error) {
 		return r.Write(v)
 	case string:
 		return r.Write([]byte(v))
+	case error:
+		return r.Write([]byte(v.Error()))
 	}
+
 	return 0, errors.New("unsupported type")
 }
 
-// SendJSON converts any data type to JSON and attaches to the response body
-func (r *Request) SendJSON(obj interface{}) (int, error) {
+// JSON marshals the given interface object and writes the JSON response.
+func (r *Request) JSON(code int, obj interface{}) (int, error) {
 	jsn, err := json.Marshal(obj)
 	if err != nil {
 		return 0, err
 	}
 
 	r.Response.Header.Set("Content-Type", "application/json")
+	r.SetStatusCode(code)
 	return r.Write(jsn)
 }
 
@@ -86,13 +101,12 @@ func (r *Request) buildUrlParams() {
 	}
 
 	params := strings.Join(baseParts[1:], "")
-
 	paramParts := strings.Split(params, "&")
 
 	for i := range paramParts {
 		keyValue := strings.Split(paramParts[i], "=")
 		if len(keyValue) > 1 {
-			r.RouteParams[keyValue[0]] = keyValue[1]
+			r.routeParams[keyValue[0]] = keyValue[1]
 		}
 	}
 }

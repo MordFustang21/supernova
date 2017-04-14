@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// GracefulListener is used as custom listener to watch connections
 type GracefulListener struct {
 	// inner listener
 	ln net.Listener
@@ -33,6 +34,7 @@ func NewGracefulListener(ln net.Listener, maxWaitTime time.Duration) net.Listene
 	}
 }
 
+// Accept waits for connection increments count and returns to the listener.
 func (ln *GracefulListener) Accept() (net.Conn, error) {
 	c, err := ln.ln.Accept()
 	if err != nil {
@@ -55,6 +57,7 @@ func (ln *GracefulListener) Close() error {
 	return ln.waitForZeroConns()
 }
 
+// Addr returns the listener's network address.
 func (ln *GracefulListener) Addr() net.Addr {
 	return ln.ln.Addr()
 }
@@ -82,6 +85,7 @@ type gracefulConn struct {
 	ln *GracefulListener
 }
 
+// Close starts listener shutdown
 func (c *gracefulConn) Close() error {
 	err := c.Conn.Close()
 	if err != nil {

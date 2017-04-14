@@ -18,8 +18,8 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-// SuperNova represents the router and all associated data
-type SuperNova struct {
+// Server represents the router and all associated data
+type Server struct {
 	server *fasthttp.Server
 	ln     net.Listener
 
@@ -34,6 +34,9 @@ type SuperNova struct {
 
 	// shutdown function called when ctl-c is intercepted
 	shutdownHandler func()
+
+	// debug defines logging for requests
+	debug bool
 }
 
 // Node holds a single route with accompanying children routes
@@ -60,16 +63,23 @@ type Middleware struct {
 	middleFunc func(*Request, func())
 }
 
-// Super returns new supernova router
-func Super() *SuperNova {
-	s := new(SuperNova)
+// New returns new supernova router
+func New() *Server {
+	s := new(Server)
 	s.cachedStatic = new(CachedStatic)
 	s.cachedStatic.files = make(map[string]*CachedObj)
 	return s
 }
 
-// Serve starts the server
-func (sn *SuperNova) Serve(addr string) error {
+// EnableDebug toggles output for incoming requests
+func (sn *Server) EnableDebug(debug bool) {
+	if debug {
+		sn.debug = true
+	}
+}
+
+// ListenAndServe starts the server
+func (sn *Server) ListenAndServe(addr string) error {
 	sn.server = &fasthttp.Server{
 		Handler: sn.handler,
 	}
@@ -84,13 +94,35 @@ func (sn *SuperNova) Serve(addr string) error {
 }
 
 // ServeTLS starts server with ssl
-func (sn *SuperNova) ServeTLS(addr, certFile, keyFile string) error {
+func (sn *Server) ListenAndServeTLS(addr, certFile, keyFile string) error {
+	sn.server = &fasthttp.Server{
+		Handler: sn.handler,
+	}
+	listener, err := net.Listen("tcp4", addr)
+	if err != nil {
+		return err
+	}
+
+	sn.ln = NewGracefulListener(listener, time.Second*5)
 	return fasthttp.ListenAndServeTLS(addr, certFile, keyFile, sn.handler)
 }
 
+// Close closes existing listener
+func (sn *Server) Close() error {
+	return sn.ln.Close()
+}
+
 // handler is the main entry point into the router
-func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
+func (sn *Server) handler(ctx *fasthttp.RequestCtx) {
 	request := NewRequest(ctx)
+	var logMethod func()
+	if sn.debug {
+		logMethod = getDebugMethod(request)
+	}
+
+	if logMethod != nil {
+		defer logMethod()
+	}
 
 	// Run Middleware
 	finished := sn.runMiddleware(request)
@@ -114,37 +146,37 @@ func (sn *SuperNova) handler(ctx *fasthttp.RequestCtx) {
 }
 
 // All adds route for all http methods
-func (sn *SuperNova) All(route string, routeFunc func(*Request)) {
-	routeObj := buildRoute(route, routeFunc)
-	sn.addRoute("", routeObj)
+func (sn *Server) All(route string, routeFunc func(*Request)) {
+	sn.addRoute("", buildRoute(route, routeFunc))
 }
 
 // Get adds only GET method to route
-func (sn *SuperNova) Get(route string, routeFunc func(*Request)) {
-	routeObj := buildRoute(route, routeFunc)
-	sn.addRoute("GET", routeObj)
+func (sn *Server) Get(route string, routeFunc func(*Request)) {
+	sn.addRoute("GET", buildRoute(route, routeFunc))
 }
 
 // Post adds only POST method to route
-func (sn *SuperNova) Post(route string, routeFunc func(*Request)) {
-	routeObj := buildRoute(route, routeFunc)
-	sn.addRoute("POST", routeObj)
+func (sn *Server) Post(route string, routeFunc func(*Request)) {
+	sn.addRoute("POST", buildRoute(route, routeFunc))
 }
 
 // Put adds only PUT method to route
-func (sn *SuperNova) Put(route string, routeFunc func(*Request)) {
-	routeObj := buildRoute(route, routeFunc)
-	sn.addRoute("PUT", routeObj)
+func (sn *Server) Put(route string, routeFunc func(*Request)) {
+	sn.addRoute("PUT", buildRoute(route, routeFunc))
 }
 
 // Delete adds only DELETE method to route
-func (sn *SuperNova) Delete(route string, routeFunc func(*Request)) {
-	routeObj := buildRoute(route, routeFunc)
-	sn.addRoute("DELETE", routeObj)
+func (sn *Server) Delete(route string, routeFunc func(*Request)) {
+	sn.addRoute("DELETE", buildRoute(route, routeFunc))
+}
+
+// Restricted adds route that is restricted by method
+func (sn *Server) Restricted(method, route string, routeFunc func(*Request)) {
+	sn.addRoute(method, buildRoute(route, routeFunc))
 }
 
 // addRoute takes route and method and adds it to route tree
-func (sn *SuperNova) addRoute(method string, route *Route) {
+func (sn *Server) addRoute(method string, route *Route) {
 	routeStr := route.route
 	if routeStr[len(routeStr)-1] == '/' {
 		routeStr = routeStr[:len(routeStr)-1]
@@ -164,19 +196,24 @@ func (sn *SuperNova) addRoute(method string, route *Route) {
 
 	currentNode := sn.paths[method]
 	for index, val := range parts {
+		childKey := val
 		if val[0] == ':' {
-			node := getNode(false, nil)
-			currentNode.children[""] = node
+			childKey = ""
+		} else {
+			childKey = val
+		}
+
+		if node, ok := currentNode.children[childKey]; ok {
 			currentNode = node
 		} else {
 			node := getNode(false, nil)
-			currentNode.children[val] = node
+			currentNode.children[childKey] = node
 			currentNode = node
 		}
 
 		if index == len(parts)-1 {
 			node := getNode(true, route)
-			currentNode.children[val] = node
+			currentNode.children[childKey] = node
 			currentNode = node
 		}
 	}
@@ -194,24 +231,42 @@ func getNode(isEdge bool, route *Route) *Node {
 }
 
 // climbTree takes in path and traverses tree to find route
-func (sn *SuperNova) climbTree(method, path string) *Route {
+func (sn *Server) climbTree(method, path string) *Route {
 	parts := strings.Split(path[1:], "/")
 	pathLen := len(parts) - 1
 
-	currentNode := sn.paths[method]
+	currentNode, ok := sn.paths[method]
+	if !ok {
+		currentNode, ok = sn.paths[""]
+		if !ok {
+			return nil
+		}
+	}
 	for index, val := range parts {
 		var node *Node
+
 		node = currentNode.children[val]
 		if node == nil {
 			node = currentNode.children[""]
 		}
 
-		if node != nil {
-			currentNode = node
+		// path not found return
+		if node == nil {
+			return nil
 		}
 
+		currentNode = node
+
+		// if at end return current route
 		if index == pathLen {
-			return currentNode.children[val].route
+			if node, ok := currentNode.children[val]; ok {
+				return node.route
+			}
+
+			if node, ok = currentNode.children[""]; ok {
+				return node.route
+			}
+
 		}
 	}
 
@@ -229,7 +284,7 @@ func buildRoute(route string, routeFunc func(*Request)) *Route {
 }
 
 // AddStatic adds static route to be served
-func (sn *SuperNova) AddStatic(dir string) {
+func (sn *Server) AddStatic(dir string) {
 	if sn.staticDirs == nil {
 		sn.staticDirs = make([]string, 0)
 	}
@@ -240,12 +295,12 @@ func (sn *SuperNova) AddStatic(dir string) {
 }
 
 // EnableGzip turns on Gzip compression for static
-func (sn *SuperNova) EnableGzip(value bool) {
+func (sn *Server) EnableGzip(value bool) {
 	sn.compressionEnabled = value
 }
 
 // serveStatic looks up folder and serves static files
-func (sn *SuperNova) serveStatic(req *Request) bool {
+func (sn *Server) serveStatic(req *Request) bool {
 	for i := range sn.staticDirs {
 		staticDir := sn.staticDirs[i]
 		path := staticDir + string(req.Request.RequestURI())
@@ -294,8 +349,8 @@ func (sn *SuperNova) serveStatic(req *Request) bool {
 	return false
 }
 
-// Adds a new function to the middleware stack
-func (sn *SuperNova) Use(f func(*Request, func())) {
+// Use adds a new function to the middleware stack
+func (sn *Server) Use(f func(*Request, func())) {
 	if sn.middleWare == nil {
 		sn.middleWare = make([]Middleware, 0)
 	}
@@ -305,7 +360,7 @@ func (sn *SuperNova) Use(f func(*Request, func())) {
 }
 
 // Internal method that runs the middleware
-func (sn *SuperNova) runMiddleware(req *Request) bool {
+func (sn *Server) runMiddleware(req *Request) bool {
 	stackFinished := true
 	for m := range sn.middleWare {
 		nextCalled := false
@@ -323,7 +378,7 @@ func (sn *SuperNova) runMiddleware(req *Request) bool {
 }
 
 // SetShutDownHandler implements function called when SIGTERM signal is received
-func (sn *SuperNova) SetShutDownHandler(shutdownFunc func()) {
+func (sn *Server) SetShutDownHandler(shutdownFunc func()) {
 	sigs := make(chan os.Signal)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	for {
