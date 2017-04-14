@@ -23,11 +23,14 @@ type Request struct {
 
 // JSONError resembles the RESTful standard for an error response
 type JSONError struct {
-	Error struct {
-		Errors  []interface{} `json:"errors"`
-		Code    int           `json:"code"`
-		Message string        `json:"message"`
-	} `json:"error"`
+	Errors  []interface{} `json:"errors"`
+	Code    int           `json:"code"`
+	Message string        `json:"message"`
+}
+
+// JSONErrors holds the JSONError response
+type JSONErrors struct {
+	Error JSONError `json:"error"`
 }
 
 // NewRequest creates a new Request pointer for an incoming request
@@ -53,12 +56,8 @@ func (r *Request) Param(key string) string {
 // Error allows an easy method to set the RESTful standard error response
 func (r *Request) Error(statusCode int, msg string, errors ...interface{}) (int, error) {
 	r.Response.Reset()
-	newErr := JSONError{
-		Error: struct {
-			Errors  []interface{}
-			Code    int
-			Message string
-		}{
+	newErr := JSONErrors{
+		Error: JSONError{
 			Errors:  errors,
 			Code:    statusCode,
 			Message: msg,
