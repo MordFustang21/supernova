@@ -46,7 +46,7 @@ func NewRequest(ctx *fasthttp.RequestCtx) *Request {
 
 // Param checks for and returns param or "" if doesn't exist
 func (r *Request) Param(key string) string {
-	if val, ok := r.routeParams["string"]; ok {
+	if val, ok := r.routeParams[key]; ok {
 		return val
 	}
 
