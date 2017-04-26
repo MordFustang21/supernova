@@ -68,6 +68,11 @@ func New() *Server {
 	s := new(Server)
 	s.cachedStatic = new(CachedStatic)
 	s.cachedStatic.files = make(map[string]*CachedObj)
+
+	s.server = &fasthttp.Server{
+		Handler: s.handler,
+	}
+
 	return s
 }
 
@@ -80,24 +85,17 @@ func (sn *Server) EnableDebug(debug bool) {
 
 // ListenAndServe starts the server
 func (sn *Server) ListenAndServe(addr string) error {
-	sn.server = &fasthttp.Server{
-		Handler: sn.handler,
-	}
 	listener, err := net.Listen("tcp4", addr)
 	if err != nil {
 		return err
 	}
 
 	sn.ln = NewGracefulListener(listener, time.Second*5)
-
 	return sn.server.Serve(sn.ln)
 }
 
 // ServeTLS starts server with ssl
 func (sn *Server) ListenAndServeTLS(addr, certFile, keyFile string) error {
-	sn.server = &fasthttp.Server{
-		Handler: sn.handler,
-	}
 	listener, err := net.Listen("tcp4", addr)
 	if err != nil {
 		return err
@@ -105,6 +103,13 @@ func (sn *Server) ListenAndServeTLS(addr, certFile, keyFile string) error {
 
 	sn.ln = NewGracefulListener(listener, time.Second*5)
 	return fasthttp.ListenAndServeTLS(addr, certFile, keyFile, sn.handler)
+}
+
+// Serve serves incoming connections from the given listener.
+//
+// Serve blocks until the given listener returns permanent error.
+func (sn *Server) Serve(ln net.Listener) error {
+	return sn.server.Serve(ln)
 }
 
 // Close closes existing listener
