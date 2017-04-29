@@ -1,61 +1,120 @@
 package supernova
 
 import (
+	"bytes"
+	"fmt"
+	"net"
 	"testing"
+	"time"
 )
 
 // Test adding Routes
 func TestServer_All(t *testing.T) {
+	urlHit := false
 	s := New()
 	s.All("/test", func(r *Request) {
-
+		urlHit = true
 	})
 
 	if s.paths[""].children["test"] == nil {
 		t.Error("Failed to insert all route")
 	}
+
+	err := sendRequest(s, "OPTION", "/test")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !urlHit {
+		t.Error("All Url not hit")
+	}
 }
 
 func TestServer_Get(t *testing.T) {
+	urlHit := false
+
 	s := New()
 	s.Get("/test", func(r *Request) {
-
+		urlHit = true
 	})
 
 	if s.paths["GET"].children["test"] == nil {
 		t.Error("Failed to insert GET route")
 	}
+
+	err := sendRequest(s, "GET", "/test")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !urlHit {
+		t.Error("All Url not hit")
+	}
 }
 
 func TestServer_Put(t *testing.T) {
+	urlHit := false
+
 	s := New()
 	s.Put("/test", func(r *Request) {
-
+		urlHit = true
 	})
 
 	if s.paths["PUT"].children["test"] == nil {
 		t.Error("Failed to insert PUT route")
 	}
+
+	err := sendRequest(s, "PUT", "/test")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !urlHit {
+		t.Error("All Url not hit")
+	}
 }
 
 func TestServer_Post(t *testing.T) {
+	urlHit := false
+
 	s := New()
 	s.Post("/test", func(r *Request) {
-
+		urlHit = true
 	})
 
 	if s.paths["POST"].children["test"] == nil {
 		t.Error("Failed to insert POST route")
 	}
+
+	err := sendRequest(s, "POST", "/test")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !urlHit {
+		t.Error("All Url not hit")
+	}
+
 }
 func TestServer_Delete(t *testing.T) {
+	urlHit := false
+
 	s := New()
 	s.Delete("/test", func(r *Request) {
-
+		urlHit = true
 	})
 
 	if s.paths["DELETE"].children["test"] == nil {
 		t.Error("Failed to insert DELETE route")
+	}
+
+	err := sendRequest(s, "DELETE", "/test")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !urlHit {
+		t.Error("All Url not hit")
 	}
 }
 
@@ -72,13 +131,24 @@ func TestServer_Use(t *testing.T) {
 }
 
 func TestServer_Restricted(t *testing.T) {
+	urlHit := false
+
 	s := New()
 	s.Restricted("OPTION", "/test", func(*Request) {
-
+		urlHit = true
 	})
 
 	if s.paths["OPTION"].children["test"] == nil {
 		t.Error("Route wasn't restricted to method")
+	}
+
+	err := sendRequest(s, "OPTION", "/test")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !urlHit {
+		t.Error("All Url not hit")
 	}
 }
 
@@ -160,4 +230,72 @@ func TestServer_EnableDebug(t *testing.T) {
 	if !s.debug {
 		t.Error("Debug mode wasn't set")
 	}
+}
+
+func TestNew(t *testing.T) {
+	s := New()
+	if s == nil {
+		t.Error("Expected *Server got nil")
+	}
+}
+
+func TestServer_SetShutDownHandler(t *testing.T) {
+	s := New()
+	s.SetShutDownHandler(func() {
+
+	})
+
+	if s.shutdownHandler == nil {
+		t.Error("Shutdown handler not set")
+	}
+}
+
+func sendRequest(s *Server, method, url string) error {
+	rw := &readWriter{}
+	rw.r.WriteString(fmt.Sprintf("%s %s HTTP/1.1\r\n\r\n", method, url))
+
+	err := s.server.ServeConn(rw)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type readWriter struct {
+	net.Conn
+	r bytes.Buffer
+	w bytes.Buffer
+}
+
+var zeroTCPAddr = &net.TCPAddr{
+	IP: net.IPv4zero,
+}
+
+func (rw *readWriter) Close() error {
+	return nil
+}
+
+func (rw *readWriter) Read(b []byte) (int, error) {
+	return rw.r.Read(b)
+}
+
+func (rw *readWriter) Write(b []byte) (int, error) {
+	return rw.w.Write(b)
+}
+
+func (rw *readWriter) RemoteAddr() net.Addr {
+	return zeroTCPAddr
+}
+
+func (rw *readWriter) LocalAddr() net.Addr {
+	return zeroTCPAddr
+}
+
+func (rw *readWriter) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+func (rw *readWriter) SetWriteDeadline(t time.Time) error {
+	return nil
 }

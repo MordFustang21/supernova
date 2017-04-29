@@ -384,20 +384,24 @@ func (sn *Server) runMiddleware(req *Request) bool {
 
 // SetShutDownHandler implements function called when SIGTERM signal is received
 func (sn *Server) SetShutDownHandler(shutdownFunc func()) {
+	sn.shutdownHandler = shutdownFunc
+
 	sigs := make(chan os.Signal)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	for {
-		select {
-		case <-sigs:
-			err := sn.ln.Close()
-			if err != nil {
-				fmt.Printf("Error closing conn: %s\n", err.Error())
-			}
+	go func() {
+		for {
+			select {
+			case <-sigs:
+				err := sn.ln.Close()
+				if err != nil {
+					fmt.Printf("Error closing conn: %s\n", err.Error())
+				}
 
-			if shutdownFunc != nil {
-				shutdownFunc()
+				if shutdownFunc != nil {
+					shutdownFunc()
+				}
+				os.Exit(0)
 			}
-			os.Exit(0)
 		}
-	}
+	}()
 }
