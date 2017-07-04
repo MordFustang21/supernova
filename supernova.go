@@ -247,6 +247,7 @@ func (sn *Server) climbTree(method, path string) *Route {
 			return nil
 		}
 	}
+
 	for index, val := range parts {
 		var node *Node
 
@@ -256,8 +257,10 @@ func (sn *Server) climbTree(method, path string) *Route {
 		}
 
 		// path not found return
-		if node == nil {
+		if node == nil && method == "" {
 			return nil
+		} else if node == nil {
+			return sn.climbTree("", path)
 		}
 
 		currentNode = node
