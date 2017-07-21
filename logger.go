@@ -8,9 +8,9 @@ package supernova
 import (
 	"fmt"
 	"os"
-	"syscall"
 	"time"
-	"unsafe"
+
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -37,8 +37,9 @@ func getDebugMethod(r *Request) func() {
 		clientIP := r.RemoteIP().String()
 		method := r.GetMethod()
 		statusCode := r.Response.StatusCode()
+
 		var statusColor, methodColor string
-		if isTerminal(os.Stdin.Fd()) {
+		if terminal.IsTerminal(int(os.Stdout.Fd())) {
 			statusColor = colorForStatus(statusCode)
 			methodColor = colorForMethod(method)
 		}
@@ -52,13 +53,6 @@ func getDebugMethod(r *Request) func() {
 			path,
 		)
 	}
-}
-
-// IsTerminal returns true if the given file descriptor is a terminal.
-func isTerminal(fd uintptr) bool {
-	var termios syscall.Termios
-	_, _, err := syscall.Syscall6(syscall.SYS_IOCTL, fd, 0x5401, uintptr(unsafe.Pointer(&termios)), 0, 0, 0)
-	return err == 0
 }
 
 func colorForStatus(code int) string {

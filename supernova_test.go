@@ -214,15 +214,6 @@ func TestServer_climbTree(t *testing.T) {
 	}
 }
 
-func TestServer_EnableGzip(t *testing.T) {
-	s := New()
-	s.EnableGzip(true)
-
-	if !s.compressionEnabled {
-		t.Error("EnableGzip wasn't set")
-	}
-}
-
 func TestServer_EnableDebug(t *testing.T) {
 	s := New()
 	s.EnableDebug(true)
@@ -261,6 +252,8 @@ func sendRequest(s *Server, method, url string) error {
 
 	return nil
 }
+
+//TODO: Benchmark climbTree
 
 type readWriter struct {
 	net.Conn
