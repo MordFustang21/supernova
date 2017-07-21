@@ -2,10 +2,7 @@
 package supernova
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
-	"mime"
 	"net"
 	"os"
 	"os/signal"
@@ -14,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/klauspost/compress/gzip"
 	"github.com/valyala/fasthttp"
 )
 
@@ -24,13 +20,8 @@ type Server struct {
 	ln     net.Listener
 
 	// radix tree for looking up routes
-	paths map[string]*Node
-
-	staticDirs         []string
-	middleWare         []Middleware
-	cachedStatic       *CachedStatic
-	maxCachedTime      int64
-	compressionEnabled bool
+	paths      map[string]*Node
+	middleWare []Middleware
 
 	// shutdown function called when ctl-c is intercepted
 	shutdownHandler func()
@@ -66,8 +57,6 @@ type Middleware struct {
 // New returns new supernova router
 func New() *Server {
 	s := new(Server)
-	s.cachedStatic = new(CachedStatic)
-	s.cachedStatic.files = make(map[string]*CachedObj)
 
 	s.server = &fasthttp.Server{
 		Handler: s.handler,
@@ -138,12 +127,6 @@ func (sn *Server) handler(ctx *fasthttp.RequestCtx) {
 	route := sn.climbTree(request.GetMethod(), request.BaseUrl)
 	if route != nil {
 		route.call(request)
-		return
-	}
-
-	// Check for static file
-	served := sn.serveStatic(request)
-	if served {
 		return
 	}
 
@@ -237,7 +220,14 @@ func getNode(isEdge bool, route *Route) *Node {
 
 // climbTree takes in path and traverses tree to find route
 func (sn *Server) climbTree(method, path string) *Route {
-	parts := strings.Split(path[1:], "/")
+	// strip slashes
+	if path[len(path)-1] == '/' {
+		path = path[1 : len(path)-1]
+	} else {
+		path = path[1:]
+	}
+
+	parts := strings.Split(path, "/")
 	pathLen := len(parts) - 1
 
 	currentNode, ok := sn.paths[method]
@@ -289,72 +279,6 @@ func buildRoute(route string, routeFunc func(*Request)) *Route {
 	routeObj.route = route
 
 	return routeObj
-}
-
-// AddStatic adds static route to be served
-func (sn *Server) AddStatic(dir string) {
-	if sn.staticDirs == nil {
-		sn.staticDirs = make([]string, 0)
-	}
-
-	if _, err := os.Stat(dir); err == nil {
-		sn.staticDirs = append(sn.staticDirs, dir)
-	}
-}
-
-// EnableGzip turns on Gzip compression for static
-func (sn *Server) EnableGzip(value bool) {
-	sn.compressionEnabled = value
-}
-
-// serveStatic looks up folder and serves static files
-func (sn *Server) serveStatic(req *Request) bool {
-	for i := range sn.staticDirs {
-		staticDir := sn.staticDirs[i]
-		path := staticDir + string(req.Request.RequestURI())
-
-		// Remove all .. for security TODO: Allow if doesn't go above basedir
-		path = strings.Replace(path, "..", "", -1)
-
-		// If ends in / default to index.html
-		if strings.HasSuffix(path, "/") {
-			path += "index.html"
-		}
-
-		stat, err := os.Stat(path)
-		if err != nil {
-			continue
-		}
-
-		// Set mime type
-		extensionParts := strings.Split(path, ".")
-		ext := extensionParts[len(extensionParts)-1]
-		mType := mime.TypeByExtension("." + ext)
-
-		if mType != "" {
-			req.Response.Header.Set("Content-Type", mType)
-		}
-
-		if sn.compressionEnabled && stat.Size() < 10000000 {
-			var b bytes.Buffer
-			writer := gzip.NewWriter(&b)
-
-			data, err := ioutil.ReadFile(path)
-			if err != nil {
-				println("Unable to read: " + err.Error())
-			}
-
-			writer.Write(data)
-			writer.Close()
-			req.Response.Header.Set("Content-Encoding", "gzip")
-			req.Send(b.String())
-		} else {
-			req.Response.SendFile(path)
-		}
-
-		return true
-	}
-	return false
 }
 
 // Use adds a new function to the middleware stack
