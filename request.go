@@ -53,6 +53,26 @@ func (r *Request) Param(key string) string {
 	return ""
 }
 
+// QueryParam parses the query string and looks for the provided key
+func (r *Request) QueryParam(key string) string {
+	s := r.QueryArgs().String()
+	args := strings.Split(s, "&")
+	if len(args) > 0 {
+		for _, val := range args {
+			parts := strings.Split(val, "=")
+			if len(parts) < 2 {
+				continue
+			}
+
+			if parts[0] == key {
+				return parts[1]
+			}
+		}
+	}
+
+	return ""
+}
+
 // Error allows an easy method to set the RESTful standard error response
 func (r *Request) Error(statusCode int, msg string, errors ...interface{}) (int, error) {
 	r.Response.Reset()
