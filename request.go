@@ -13,7 +13,9 @@ import (
 // Request resembles an incoming request
 type Request struct {
 	*fasthttp.RequestCtx
+
 	routeParams map[string]string
+	queryParams map[string]string
 	BaseUrl     string
 
 	// Writer is used to write to response body
@@ -38,15 +40,25 @@ func NewRequest(ctx *fasthttp.RequestCtx) *Request {
 	req := new(Request)
 	req.RequestCtx = ctx
 	req.routeParams = make(map[string]string)
+	req.queryParams = make(map[string]string)
 	req.BaseUrl = string(ctx.URI().Path())
 	req.Writer = ctx.Response.BodyWriter()
 
 	return req
 }
 
-// Param checks for and returns param or "" if doesn't exist
-func (r *Request) Param(key string) string {
+// RouteParam checks for and returns param or "" if doesn't exist
+func (r *Request) RouteParam(key string) string {
 	if val, ok := r.routeParams[key]; ok {
+		return val
+	}
+
+	return ""
+}
+
+// QueryParam checks for and returns param or "" if doesn't exist
+func (r *Request) QueryParam(key string) string {
+	if val, ok := r.queryParams[key]; ok {
 		return val
 	}
 
@@ -77,6 +89,13 @@ func (r *Request) buildRouteParams(route string) {
 			routeParams[val[1:]] = reqParts[index]
 		}
 	}
+}
+
+// buildQueryParams parses out all query params and places them in map
+func (r *Request) buildQueryParams() {
+	r.RequestCtx.QueryArgs().VisitAll(func(key, value []byte) {
+		r.queryParams[string(key)] = string(value)
+	})
 }
 
 // ReadJSON unmarshals request body into the struct provided

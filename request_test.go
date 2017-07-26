@@ -72,7 +72,7 @@ func TestRequest_Param(t *testing.T) {
 	s := New()
 
 	s.Get("/user/:name", func(r *Request) {
-		n := r.Param("name")
+		n := r.RouteParam("name")
 		if n != "gopher" {
 			t.Errorf("Expected gopher got %s", n)
 		}
