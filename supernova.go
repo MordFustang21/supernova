@@ -83,7 +83,7 @@ func (sn *Server) ListenAndServe(addr string) error {
 	return sn.server.Serve(sn.ln)
 }
 
-// ServeTLS starts server with ssl
+// ListenAndServeTLS starts server with ssl
 func (sn *Server) ListenAndServeTLS(addr, certFile, keyFile string) error {
 	listener, err := net.Listen("tcp4", addr)
 	if err != nil {
@@ -95,8 +95,6 @@ func (sn *Server) ListenAndServeTLS(addr, certFile, keyFile string) error {
 }
 
 // Serve serves incoming connections from the given listener.
-//
-// Serve blocks until the given listener returns permanent error.
 func (sn *Server) Serve(ln net.Listener) error {
 	return sn.server.Serve(ln)
 }
