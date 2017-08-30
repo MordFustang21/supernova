@@ -43,6 +43,7 @@ func NewRequest(ctx *fasthttp.RequestCtx) *Request {
 	req.queryParams = make(map[string]string)
 	req.BaseUrl = string(ctx.URI().Path())
 	req.Writer = ctx.Response.BodyWriter()
+	req.buildQueryParams()
 
 	return req
 }
