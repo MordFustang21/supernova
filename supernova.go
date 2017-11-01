@@ -54,6 +54,9 @@ type Middleware struct {
 	middleFunc func(*Request, func())
 }
 
+// Handler is the type used to define a handler function
+type Handler func(*Request) (int, error)
+
 // New returns new supernova router
 func New() *Server {
 	s := new(Server)
@@ -132,32 +135,32 @@ func (sn *Server) handler(ctx *fasthttp.RequestCtx) {
 }
 
 // All adds route for all http methods
-func (sn *Server) All(route string, routeFunc func(*Request)) {
+func (sn *Server) All(route string, routeFunc Handler) {
 	sn.addRoute("", buildRoute(route, routeFunc))
 }
 
 // Get adds only GET method to route
-func (sn *Server) Get(route string, routeFunc func(*Request)) {
+func (sn *Server) Get(route string, routeFunc Handler) {
 	sn.addRoute("GET", buildRoute(route, routeFunc))
 }
 
 // Post adds only POST method to route
-func (sn *Server) Post(route string, routeFunc func(*Request)) {
+func (sn *Server) Post(route string, routeFunc Handler) {
 	sn.addRoute("POST", buildRoute(route, routeFunc))
 }
 
 // Put adds only PUT method to route
-func (sn *Server) Put(route string, routeFunc func(*Request)) {
+func (sn *Server) Put(route string, routeFunc Handler) {
 	sn.addRoute("PUT", buildRoute(route, routeFunc))
 }
 
 // Delete adds only DELETE method to route
-func (sn *Server) Delete(route string, routeFunc func(*Request)) {
+func (sn *Server) Delete(route string, routeFunc Handler) {
 	sn.addRoute("DELETE", buildRoute(route, routeFunc))
 }
 
 // Restricted adds route that is restricted by method
-func (sn *Server) Restricted(method, route string, routeFunc func(*Request)) {
+func (sn *Server) Restricted(method, route string, routeFunc Handler) {
 	sn.addRoute(method, buildRoute(route, routeFunc))
 }
 
@@ -270,7 +273,7 @@ func (sn *Server) climbTree(method, path string) *Route {
 }
 
 // buildRoute creates new Route
-func buildRoute(route string, routeFunc func(*Request)) *Route {
+func buildRoute(route string, routeFunc Handler) *Route {
 	routeObj := new(Route)
 	routeObj.routeFunc = routeFunc
 	routeObj.routeParamsIndex = make(map[int]string)

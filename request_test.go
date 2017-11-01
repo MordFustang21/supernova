@@ -55,7 +55,7 @@ func TestRequest_JSON(t *testing.T) {
 
 func TestRequest_ReadJSON(t *testing.T) {
 	r := NewRequest(new(fasthttp.RequestCtx))
-	r.Request.SwapBody([]byte("{\"key\":\"test\"}"))
+	r.Request.SetBody([]byte("{\"key\":\"test\"}"))
 
 	var jsn jStruct
 	err := r.ReadJSON(&jsn)
@@ -71,11 +71,13 @@ func TestRequest_ReadJSON(t *testing.T) {
 func TestRequest_Param(t *testing.T) {
 	s := New()
 
-	s.Get("/user/:name", func(r *Request) {
+	s.Get("/user/:name", func(r *Request) (int, error){
 		n := r.RouteParam("name")
 		if n != "gopher" {
 			t.Errorf("Expected gopher got %s", n)
 		}
+
+		return 0, nil
 	})
 
 	err := sendRequest(s, "GET", "/user/gopher")

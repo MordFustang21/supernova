@@ -12,8 +12,9 @@ import (
 func TestServer_All(t *testing.T) {
 	urlHit := false
 	s := New()
-	s.All("/test", func(r *Request) {
+	s.All("/test", func(r *Request) (int, error) {
 		urlHit = true
+		return 0, nil
 	})
 
 	if s.paths[""].children["test"] == nil {
@@ -34,8 +35,9 @@ func TestServer_Get(t *testing.T) {
 	urlHit := false
 
 	s := New()
-	s.Get("/test", func(r *Request) {
+	s.Get("/test", func(r *Request) (int, error) {
 		urlHit = true
+		return 0, nil
 	})
 
 	if s.paths["GET"].children["test"] == nil {
@@ -56,8 +58,9 @@ func TestServer_Put(t *testing.T) {
 	urlHit := false
 
 	s := New()
-	s.Put("/test", func(r *Request) {
+	s.Put("/test", func(r *Request) (int, error) {
 		urlHit = true
+		return 0, nil
 	})
 
 	if s.paths["PUT"].children["test"] == nil {
@@ -78,8 +81,9 @@ func TestServer_Post(t *testing.T) {
 	urlHit := false
 
 	s := New()
-	s.Post("/test", func(r *Request) {
+	s.Post("/test", func(r *Request) (int, error) {
 		urlHit = true
+		return 0, nil
 	})
 
 	if s.paths["POST"].children["test"] == nil {
@@ -100,8 +104,9 @@ func TestServer_Delete(t *testing.T) {
 	urlHit := false
 
 	s := New()
-	s.Delete("/test", func(r *Request) {
+	s.Delete("/test", func(r *Request) (int, error) {
 		urlHit = true
+		return 0, nil
 	})
 
 	if s.paths["DELETE"].children["test"] == nil {
@@ -134,8 +139,9 @@ func TestServer_Restricted(t *testing.T) {
 	urlHit := false
 
 	s := New()
-	s.Restricted("OPTION", "/test", func(*Request) {
+	s.Restricted("OPTION", "/test", func(*Request) (int, error) {
 		urlHit = true
+		return 0, nil
 	})
 
 	if s.paths["OPTION"].children["test"] == nil {
@@ -154,12 +160,12 @@ func TestServer_Restricted(t *testing.T) {
 
 func TestMultipleChildren(t *testing.T) {
 	s := New()
-	s.All("/test/stuff", func(*Request) {
-
+	s.All("/test/stuff", func(*Request) (int, error) {
+		return 0, nil
 	})
 
-	s.All("/test/test", func(*Request) {
-
+	s.All("/test/test", func(*Request) (int, error) {
+		return 0, nil
 	})
 
 	if len(s.paths[""].children["test"].children) != 2 {
@@ -192,12 +198,12 @@ func TestServer_climbTree(t *testing.T) {
 	}
 
 	s := New()
-	s.Get("/test", func(*Request) {
-
+	s.Get("/test", func(*Request) (int, error) {
+		return 0, nil
 	})
 
-	s.Get("/stuff/:test/params/:more", func(*Request) {
-
+	s.Get("/stuff/:test/params/:more", func(*Request) (int, error) {
+		return 0, nil
 	})
 
 	for _, val := range cases {
