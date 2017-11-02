@@ -1,4 +1,5 @@
-# Supernova
+![Supernova Logo](https://raw.githubusercontent.com/MordFustang21/supernova-logo/master/supernova_banner.png)
+
 [![GoDoc](https://godoc.org/github.com/MordFustang21/supernova?status.svg)](https://godoc.org/github.com/MordFustang21/supernova)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mordfustang21/supernova)](https://goreportcard.com/report/github.com/mordfustang21/supernova)
 [![Build Status](https://travis-ci.org/MordFustang21/supernova.svg?branch=v2)](https://travis-ci.org/MordFustang21/supernova)
