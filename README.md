@@ -1,75 +1,100 @@
 # Supernova
 [![GoDoc](https://godoc.org/github.com/MordFustang21/supernova?status.svg)](https://godoc.org/github.com/MordFustang21/supernova)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mordfustang21/supernova)](https://goreportcard.com/report/github.com/mordfustang21/supernova)
-[![Build Status](https://travis-ci.org/MordFustang21/supernova.svg?branch=master)](https://travis-ci.org/MordFustang21/supernova)
+[![Build Status](https://travis-ci.org/MordFustang21/supernova.svg?branch=v2)](https://travis-ci.org/MordFustang21/supernova)
 
 An express like router for fasthttp
 
 Provides a lot of the same methods and functionality as Expressjs
 
-Example
+### Start using it
+1. Download and install
+```
+$ go get github.com/MordFustang21/supernova
+```
+2. Import it into your code
+```
+import "github.com/MordFustang21/supernova"
+```
+
+### Use a vendor tool like dep
+1. go get dep
+```
+$ go get -u github.com/golang/dep/cmd/dep
+```
+2. cd to project folder and run dep
+```
+$ dep ensure
+```
+
+Refer to [dep](https://github.com/golang/dep) for more information
+
+### Basic Usage
+http://localhost:8080/hello
+```go
+package main
+
+import "github.com/MordFustang21/supernova"
+
+func main() {
+	s := supernova.New()
+	
+	s.Get("/hello", func(request *supernova.Request) (int, error) {
+	    return request.Send("world")
+	})
+	
+	s.ListenAndServe(":8080")
+}
+
+```
+#### Retrieving parameters
+http://localhost:8080/hello/world
+```go
+package main
+
+import "github.com/MordFustang21/supernova"
+
+func main() {
+	s := supernova.New()
+	
+	s.Get("/hello/:text", func(request *supernova.Request) (int, error) {
+		t := request.RouteParam("text")
+	    return request.Send(t)
+	})
+	
+	s.ListenAndServe(":8080")
+}
+```
+
+#### Returning Errors
+http://localhost:8080/hello
 ```go
 package main
 
 import (
-	"fmt"
-
+	"net/http"
 	"github.com/MordFustang21/supernova"
 )
 
 func main() {
-	// Get new instance of server
 	s := supernova.New()
-
-	//Middleware Example
-	s.Use(func(req *supernova.Request, next func()) {
-		req.Response.Header.Set("Powered-By", "supernova")
-		next()
-	})
-
-	//Route Examples
-	s.Post("/test/taco/:apple", func(req *supernova.Request) {
-
-		// Get query parameters
-		limit := req.QueryParam("limit")
-
-		type test struct {
-			Apple string
-		}
-
-		// Read JSON into struct from body
-		var testS test
-		err := req.ReadJSON(&testS)
+	
+	s.Post("/hello", func(request *supernova.Request) (int, error) {
+		r := struct {
+		 World string
+		}{}
+		
+		// ReadJSON will attempt to unmarshall the json from the request body into the given struct
+		err := request.ReadJSON(&r)
 		if err != nil {
-			fmt.Println("Error:", err)
+		    return request.Error(http.StatusBadRequest, "couldn't parse request", err.Error())
 		}
-
-		req.Send("Received data " + limit)
+		
+		// JSON will marshall the given object and marshall into into the response body
+		return request.JSON(http.StatusOK, r)
 	})
-
-	// Example Get route with route params
-	s.Get("/test/:taco/:apple", func(req *supernova.Request) {
-		tacoType := req.RouteParam("taco")
-		req.Send(tacoType)
-	})
-
-	// Resticted routes are used to restict methods other than GET,PUT,POST,DELETE
-	s.Restricted("OPTIONS", "/test/stuff", func(req *supernova.Request) {
-		req.Send("OPTIONS Request received")
-	})
-
-	// Example post returning error
-	s.Post("/register", func(req *supernova.Request) {
-		if len(req.Request.Body()) == 0 {
-			// response code, error message, and any struct you want put into the errors array
-			req.Error(500, "Body is empty")
-		}
-	})
-
-	err := s.ListenAndServe(":8080")
-	if err != nil {
-		println(err.Error())
-	}
+	
+	s.ListenAndServe(":8080")
+	
 }
-
 ```
