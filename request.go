@@ -3,6 +3,7 @@ package supernova
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -25,9 +26,9 @@ type Request struct {
 
 // JSONError resembles the RESTful standard for an error response
 type JSONError struct {
-	Errors  []interface{} `json:"errors"`
-	Code    int           `json:"code"`
-	Message string        `json:"message"`
+	Errors  []string `json:"errors"`
+	Code    int      `json:"code"`
+	Message string   `json:"message"`
 }
 
 // JSONErrors holds the JSONError response
@@ -66,16 +67,34 @@ func (r *Request) QueryParam(key string) string {
 	return ""
 }
 
-// Error allows an easy method to set the RESTful standard error response
-func (r *Request) Error(statusCode int, msg string, errors ...interface{}) (int, error) {
+// Error provides and easy way to send a structured error response
+// Error will use error and fmt.Stringer interface otherwise fmt %v
+func (r *Request) Error(statusCode int, msg string, errs ...interface{}) (int, error) {
 	r.Response.Reset()
+
+	var errList []string
+
+	// Attempt to get string of errors
+	for _, err := range errs {
+		switch v := err.(type) {
+		case error:
+			errList = append(errList, v.Error())
+		case fmt.Stringer:
+			errList = append(errList, v.String())
+		default:
+			errList = append(errList, fmt.Sprintf("%v", v))
+		}
+	}
+
+	// Format error response
 	newErr := JSONErrors{
 		Error: JSONError{
-			Errors:  errors,
+			Errors:  errList,
 			Code:    statusCode,
 			Message: msg,
 		},
 	}
+
 	return r.JSON(statusCode, newErr)
 }
 
