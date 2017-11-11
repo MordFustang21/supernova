@@ -2,13 +2,11 @@
 package supernova
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/valyala/fasthttp"
@@ -25,6 +23,7 @@ type Server struct {
 
 	// shutdown function called when ctl-c is intercepted
 	shutdownHandler func()
+	shutdownTime    time.Duration
 
 	// debug defines logging for requests
 	debug bool
@@ -65,6 +64,8 @@ func New() *Server {
 		Handler: s.handler,
 	}
 
+	s.shutdownTime = 5 * time.Second
+
 	return s
 }
 
@@ -82,7 +83,7 @@ func (sn *Server) ListenAndServe(addr string) error {
 		return err
 	}
 
-	sn.ln = NewGracefulListener(listener, time.Second*5)
+	sn.ln = NewGracefulListener(listener)
 	return sn.server.Serve(sn.ln)
 }
 
@@ -93,8 +94,47 @@ func (sn *Server) ListenAndServeTLS(addr, certFile, keyFile string) error {
 		return err
 	}
 
-	sn.ln = NewGracefulListener(listener, time.Second*5)
+	sn.ln = NewGracefulListener(listener)
 	return fasthttp.ListenAndServeTLS(addr, certFile, keyFile, sn.handler)
+}
+
+// ListenAndServeGraceful waits for all connections to close before shutting down
+func (sn *Server) ListenAndServeGraceful(addr string) error {
+	var err error
+	go func() {
+		err = sn.ListenAndServe(addr)
+	}()
+
+	if err != nil {
+		return err
+	}
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
+
+	<-stop
+
+	// Call shutdown and users provided handler
+	err = sn.ShutdownTimeout(sn.shutdownTime)
+	if sn.shutdownHandler != nil {
+		sn.shutdownHandler()
+	}
+	return err
+}
+
+// Shutdown waits for all connections to close
+func (sn *Server) Shutdown() error {
+	return sn.ln.Close()
+}
+
+// ShutdownTimeout waits for all connections to close or time.After duration
+func (sn *Server) ShutdownTimeout(t time.Duration) error {
+	return sn.ln.(*GracefulListener).CloseTimeout(t)
+}
+
+// SetShutdownTimeout sets new shutdown timeout
+func (sn *Server) SetShutdownTimeout(t time.Duration) {
+	sn.shutdownTime = t
 }
 
 // Serve serves incoming connections from the given listener.
@@ -313,23 +353,4 @@ func (sn *Server) runMiddleware(req *Request) bool {
 // SetShutDownHandler implements function called when SIGTERM signal is received
 func (sn *Server) SetShutDownHandler(shutdownFunc func()) {
 	sn.shutdownHandler = shutdownFunc
-
-	sigs := make(chan os.Signal)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		for {
-			select {
-			case <-sigs:
-				err := sn.ln.Close()
-				if err != nil {
-					fmt.Printf("Error closing conn: %s\n", err.Error())
-				}
-
-				if shutdownFunc != nil {
-					shutdownFunc()
-				}
-				os.Exit(0)
-			}
-		}
-	}()
 }

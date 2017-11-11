@@ -4,9 +4,10 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/mordfustang21/supernova)](https://goreportcard.com/report/github.com/mordfustang21/supernova)
 [![Build Status](https://travis-ci.org/MordFustang21/supernova.svg?branch=v2)](https://travis-ci.org/MordFustang21/supernova)
 
-An express like router for fasthttp
+supernova is a custom router for fasthttp. While we don't claim to be the best or fastest we are still very fast thanks to [fasthttp](https://github.com/valyala/fasthttp)
+and help you be highly productive by providing easy to use tools that help build up your api quickly.
 
-Provides a lot of the same methods and functionality as Expressjs
+*Note supernova's exported API interface will continue to change in unpredictable, backwards-incompatible ways until we tag a v2.0.0 release.
 
 ### Start using it
 1. Download and install
